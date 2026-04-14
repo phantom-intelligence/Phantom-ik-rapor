@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { ChevronDown, BarChart3, LayoutGrid, Table, GitCompare, X, ExternalLink, Phone, Mail, Search, Users, Star, TrendingUp, UserX, Loader2 } from "lucide-react";
+import { ChevronDown, BarChart3, LayoutGrid, Table, GitCompare, X, ExternalLink, Phone, Mail, Search, Users, Star, TrendingUp, UserX, Loader2, Lock } from "lucide-react";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
 // ─── BRANDING ───
@@ -30,7 +30,7 @@ function puanRengi(p,d){
 }
 function barRengi(y){if(y>=70)return GUCLU;if(y>=40)return ORTA;return ZAYIF}
 
-// ─── YILDIZ FORMÜL: puan >= 80 VE yetkinlik %75+ ───
+// ─── YILDIZ FORMÜL ───
 function isYildiz(a){
   if(a.elendi) return false;
   return a.puan >= 80 && (a.puanDetay.Y / MAKS.Y) * 100 >= 75;
@@ -50,7 +50,6 @@ function grupla(adaylar){
 }
 const ALTIN_BORDER_GRAD="linear-gradient(180deg, #C9952C 0%, #DFC070 15%, #F5E6A3 35%, #D4AF37 50%, #F5E6A3 65%, #DFC070 85%, #C9952C 100%)";
 
-// ─── ÖZET TRUNCATE ───
 function ozetKisa(text){
   if(!text) return "";
   const dot = text.indexOf(".");
@@ -59,18 +58,11 @@ function ozetKisa(text){
   return text;
 }
 
-// ─── METALİK PUAN STILI ───
 function metalikPuanStyle(isGold){
   if(!isGold) return {};
-  return {
-    background: ALTIN_TEXT_GRAD,
-    WebkitBackgroundClip: "text",
-    WebkitTextFillColor: "transparent",
-    backgroundClip: "text",
-  };
+  return { background: ALTIN_TEXT_GRAD, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" };
 }
 
-// ─── DASHBOARD KARTI ───
 function DashKart({ikon,baslik,deger,renk,alt}){
   return(<div style={{flex:"1 1 140px",background:BG,padding:"20px 18px",boxShadow:"0 1px 2px rgba(0,0,0,0.05)",minWidth:130,fontFamily:FONT}}>
     <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>{ikon}<span style={{fontSize:10,color:"#888",textTransform:"uppercase",letterSpacing:1.5,fontWeight:700}}>{baslik}</span></div>
@@ -79,7 +71,6 @@ function DashKart({ikon,baslik,deger,renk,alt}){
   </div>)
 }
 
-// ─── KARŞILAŞTIR MODAL ───
 function Karsilastir({adaylar,kapat}){
   const[a,b]=adaylar;const ks=Object.keys(MAKS);
   return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.7)",backdropFilter:"blur(4px)",zIndex:999,display:"flex",alignItems:"center",justifyContent:"center",padding:20,fontFamily:FONT}} onClick={kapat}>
@@ -104,7 +95,6 @@ function Karsilastir({adaylar,kapat}){
   </div>)
 }
 
-// ─── ADAY KARTI ───
 function AdayKart({aday,acik,toggle,karsilastirSecili,karsilastirToggle,isLast}){
   const renk=puanRengi(aday.puan,aday.durum);const secili=karsilastirSecili;
   const isGold=aday.durum==="yildiz";
@@ -148,7 +138,6 @@ function AdayKart({aday,acik,toggle,karsilastirSecili,karsilastirToggle,isLast})
   </div>)
 }
 
-// ─── TABLO ───
 function TabloGorunumu({adaylar}){return(<div style={{overflowX:"auto",fontFamily:FONT}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}><thead><tr style={{background:SIYAH,color:BEYAZ}}>{["Aday","Pozisyon","Departman","Den.","D","Y","K","E","Puan","Durum"].map(h=>(<th key={h} style={{padding:"11px 10px",textAlign:"left",fontSize:10,fontWeight:600,letterSpacing:.5,textTransform:"uppercase",whiteSpace:"nowrap"}}>{h}</th>))}</tr></thead><tbody>{adaylar.map((a,i)=>(<tr key={a.id} style={{background:i%2===0?BG:"#1A1A1E",borderBottom:"1px solid #1E1E22"}}><td style={{padding:10,fontWeight:600,color:YAZI}}>{a.isim}</td><td style={{padding:10,color:"#AAAAAA"}}>{a.pozisyon}</td><td style={{padding:10,color:"#777"}}>{a.departman}</td><td style={{padding:10,color:"#777"}}>{a.deneyim}</td>{Object.entries(a.puanDetay).map(([k,v])=>(<td key={k} style={{padding:10,fontWeight:600,color:barRengi(yuzde(v,MAKS[k]))}}>{v}</td>))}<td style={{padding:10,fontWeight:500,fontSize:16,color:puanRengi(a.puan,a.durum),letterSpacing:-.5,...metalikPuanStyle(a.durum==="yildiz")}}>{a.puan}</td><td style={{padding:10}}>{a.durum==="yildiz"&&<span style={{background:ALTIN_GRAD,color:SIYAH,padding:"3px 10px",fontSize:9,fontWeight:700,letterSpacing:.5}}>★ YILDIZ</span>}{a.durum==="elendi"&&<span style={{background:ZAYIF,color:BEYAZ,padding:"3px 10px",fontSize:9,fontWeight:700,letterSpacing:.5}}>✗ ELENDİ</span>}{a.durum==="gecti"&&<span style={{background:GUCLU,color:BEYAZ,padding:"3px 10px",fontSize:9,fontWeight:700,letterSpacing:.5}}>✓ GEÇTİ</span>}</td></tr>))}</tbody></table></div>)}
 
 // ─── ANA COMPONENT ───
@@ -156,16 +145,30 @@ export default function InteraktifRapor(){
   const [adaylarData, setAdaylarData] = useState([]);
   const [yukleniyor, setYukleniyor] = useState(true);
   const [hata, setHata] = useState(null);
+  
+  // YENİ: YETKİSİZ GİRİŞ KONTROLÜ
+  const [yetkisizGiris, setYetkisizGiris] = useState(false);
 
   const[arama,setArama]=useState("");const[deptFiltre,setDeptFiltre]=useState("Tümü");const[durumFiltre,setDurumFiltre]=useState("Tümü");const[siralama,setSiralama]=useState("puan");const[puanAralik,setPuanAralik]=useState([0,100]);const[acikKartlar,setAcikKartlar]=useState(new Set());const[gorunum,setGorunum]=useState("kart");const[karsilastirListesi,setKarsilastirListesi]=useState([]);const[karsilastirAcik,setKarsilastirAcik]=useState(false);const[grafikAcik,setGrafikAcik]=useState(true);
   const[hoveredDept,setHoveredDept]=useState(null);
 
-  // KRİTİK EKLENTİ: SİYAH ARKA PLAN
-  useEffect(() => { document.body.style.backgroundColor = "#0A0A0A"; }, []);
+  useEffect(() => { 
+    document.body.style.backgroundColor = "#0A0A0A"; 
 
-  // CANLI VERİ BAĞLANTISI
-  useEffect(() => {
-    const webhookUrl = "https://drkproductions.app.n8n.cloud/webhook/94a212b8-3b87-4326-a765-511364a8fc3a";
+    // URL'den ID parametresini yakala
+    const urlParams = new URLSearchParams(window.location.search);
+    const raporId = urlParams.get('id');
+
+    // ID yoksa anında kapıyı kapat
+    if (!raporId) {
+      setYetkisizGiris(true);
+      setYukleniyor(false);
+      return;
+    }
+
+    // ID varsa, bunu n8n'e gönder
+    const webhookUrl = `https://drkproductions.app.n8n.cloud/webhook/94a212b8-3b87-4326-a765-511364a8fc3a?id=${raporId}`;
+
     fetch(webhookUrl)
       .then((res) => {
         if (!res.ok) throw new Error("Ağ hatası");
@@ -178,10 +181,7 @@ export default function InteraktifRapor(){
             const pd = a.puanDetay || a.puanYuzde || { D: 0, Y: 0, K: 0, E: 0 };
             const guvenliAday = { ...a, puanDetay: pd };
             const isY = isYildiz(guvenliAday);
-            return {
-              ...guvenliAday,
-              durum: (guvenliAday.durum || "").toLowerCase().includes("elendi") ? "elendi" : isY ? "yildiz" : "gecti",
-            };
+            return { ...guvenliAday, durum: (guvenliAday.durum || "").toLowerCase().includes("elendi") ? "elendi" : isY ? "yildiz" : "gecti" };
           });
           setAdaylarData(formatli);
         } else {
@@ -209,9 +209,7 @@ export default function InteraktifRapor(){
     if(durumFiltre==="Yıldız Adaylar")s=s.filter(a=>a.durum==="yildiz");
     else if(durumFiltre==="Geçen Adaylar")s=s.filter(a=>a.durum==="gecti");
     else if(durumFiltre==="Elenen Adaylar")s=s.filter(a=>a.durum==="elendi");
-    
     s=s.filter(a=>a.puan>=puanAralik[0]&&a.puan<=puanAralik[1]);
-    
     if(siralama==="puan"){
       const durumSira={yildiz:0,gecti:1,elendi:2};
       s.sort((a,b)=>durumSira[a.durum]-durumSira[b.durum]||b.puan-a.puan)
@@ -222,7 +220,6 @@ export default function InteraktifRapor(){
     else if(siralama==="yetkinlik_puan")s.sort((a,b)=>yuzde(b.puanDetay.Y,MAKS.Y)-yuzde(a.puanDetay.Y,MAKS.Y));
     else if(siralama==="kariyer_puan")s.sort((a,b)=>yuzde(b.puanDetay.K,MAKS.K)-yuzde(a.puanDetay.K,MAKS.K));
     else if(siralama==="egitim_puan")s.sort((a,b)=>yuzde(b.puanDetay.E,MAKS.E)-yuzde(a.puanDetay.E,MAKS.E));
-    
     return s;
   },[adaylarData,arama,deptFiltre,durumFiltre,siralama,puanAralik]);
   
@@ -232,8 +229,7 @@ export default function InteraktifRapor(){
   const elenSayisi=adaylarData.filter(a=>a.durum==="elendi").length;
   
   const deptData=useMemo(()=>{
-    const c={};
-    adaylarData.forEach(a=>{c[a.departman]=(c[a.departman]||0)+1});
+    const c={}; adaylarData.forEach(a=>{c[a.departman]=(c[a.departman]||0)+1});
     return Object.entries(c).sort((a,b)=>b[1]-a[1]).map(([n,v])=>({name:n,fullName:n,value:v,fill:DEPT_RENK[n]||"#999"}))
   },[adaylarData]);
   
@@ -245,6 +241,21 @@ export default function InteraktifRapor(){
 
   function karsilastirToggle(aday){
     setKarsilastirListesi(p=>{const v=p.find(a=>a.id===aday.id);if(v)return p.filter(a=>a.id!==aday.id);if(p.length>=2)return[p[1],aday];return[...p,aday]})
+  }
+
+  // YENİ: YETKİSİZ GİRİŞ EKRANI
+  if (yetkisizGiris) {
+    return (
+      <div style={{ minHeight: "100vh", background: BG, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: FONT, padding: 20, textAlign: "center" }}>
+        <div style={{ width: 64, height: 64, borderRadius: "50%", background: "#1A1A1E", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 20 }}>
+          <Lock size={32} color={ZAYIF} />
+        </div>
+        <div style={{ fontSize: 24, fontWeight: 700, color: YAZI, letterSpacing: "-0.5px", marginBottom: 10 }}>Erişim Reddedildi</div>
+        <div style={{ fontSize: 14, color: "#888", maxWidth: 400, lineHeight: "1.6" }}>
+          Bu raporu görüntülemek için yetkiniz bulunmuyor veya bağlantı süresi dolmuş. Lütfen sistem yöneticinizden veya Phantom Intelligence ekibinden güncel bir erişim bağlantısı talep edin.
+        </div>
+      </div>
+    );
   }
 
   if (yukleniyor) {
@@ -259,11 +270,7 @@ export default function InteraktifRapor(){
   }
 
   if (hata) {
-    return (
-      <div style={{ minHeight: "100vh", background: BG, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT, color: ZAYIF, fontWeight: 500 }}>
-        {hata}
-      </div>
-    );
+    return (<div style={{ minHeight: "100vh", background: BG, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT, color: ZAYIF, fontWeight: 500 }}>{hata}</div>);
   }
 
   const ss={fontSize:12,padding:"8px 12px",border:"1px solid #2A2A2E",background:BG,color:"#BBBBBB",outline:"none",minWidth:100,fontWeight:500,fontFamily:FONT};
@@ -276,13 +283,13 @@ export default function InteraktifRapor(){
   <div style={{textAlign:"center"}}>
   <div style={{fontSize:10,color:"#666666",letterSpacing:4,textTransform:"uppercase",fontWeight:600}}>Phantom Intelligence</div>
   <div style={{fontSize:26,fontWeight:500,color:BEYAZ,marginTop:8,letterSpacing:-.5}}>Haftalık Aday Raporu</div>
-  <div style={{fontSize:12,color:"#777",marginTop:6,fontWeight:400}}>Canlı Veri Bağlantısı Aktif</div>
+  <div style={{fontSize:12,color:"#777",marginTop:6,fontWeight:400}}>Gizli ve Güvenli Bağlantı</div>
   </div>
   <div style={{height:2,background:`linear-gradient(90deg, transparent, #B34D08, transparent)`,marginTop:20,borderRadius:1}}/>
   </div>
   
   <div style={{display:"flex",gap:12,padding:"20px 20px 0",flexWrap:"wrap"}}>
-  <DashKart ikon={<Users size={18} color="#555"/>} baslik="Toplam" deger={toplam} renk="#555" alt="başvuru bu hafta"/>
+  <DashKart ikon={<Users size={18} color="#555"/>} baslik="Toplam" deger={toplam} renk="#555" alt="başvuru"/>
   <DashKart ikon={<Star size={18} color={ALTIN_SOLID}/>} baslik="Yıldız" deger={yildizSayisi} renk={ALTIN_SOLID} alt={toplam>0?`%${Math.round(yildizSayisi/toplam*100)} oran`:"%0 oran"}/>
   <DashKart ikon={<TrendingUp size={18} color={GUCLU}/>} baslik="Geçen" deger={toplam-yildizSayisi-elenSayisi} renk={GUCLU} alt={toplam>0?`%${Math.round((toplam-yildizSayisi-elenSayisi)/toplam*100)} oran`:"%0 oran"}/>
   <DashKart ikon={<UserX size={18} color={ZAYIF}/>} baslik="Elenen" deger={elenSayisi} renk={ZAYIF} alt={toplam>0?`%${Math.round(elenSayisi/toplam*100)} oran`:"%0 oran"}/>

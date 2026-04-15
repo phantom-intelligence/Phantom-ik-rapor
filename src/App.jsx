@@ -1,10 +1,10 @@
 import { useState, useMemo, useEffect } from "react";
-import { ChevronDown, BarChart3, LayoutGrid, Table, GitCompare, X, ExternalLink, Phone, Mail, Search, Users, Star, TrendingUp, UserX, Loader2, Lock } from "lucide-react";
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { ChevronDown, BarChart3, LayoutGrid, Table, GitCompare, X, ExternalLink, Phone, Mail, Search, Users, Star, TrendingUp, UserX, Loader2, Lock, MessageSquare, FileText } from "lucide-center";
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis } from "recharts";
 
 // ─── BRANDING ───
 const SIYAH = "#0A0A0A";
-const TURUNCU = "#E8620A";
+const TURUNCU = "#D95B00";
 const ALTIN_SOLID = "#D4AF37";
 const ALTIN_GRAD = "linear-gradient(135deg, #CFAD58, #EED18D, #B88E33)";
 const ALTIN_TEXT_GRAD = "linear-gradient(135deg, #BF953F 0%, #FCF6BA 25%, #B38728 50%, #FBF5B7 75%, #AA771C 100%)";
@@ -58,25 +58,127 @@ function ozetKisa(text){
   return text;
 }
 
+// ─── DEPARTMAN SIRALAMASI ───
+function deptSiralama(aday, tumAdaylar){
+  const deptAdaylar=tumAdaylar.filter(a=>a.departman===aday.departman).sort((a,b)=>b.puan-a.puan);
+  const sira=deptAdaylar.findIndex(a=>a.id===aday.id)+1;
+  return{sira,toplam:deptAdaylar.length};
+}
+
+// ─── RİSK BAYRAKLARI ───
+function riskBayraklari(aday){
+  const flags=[];
+  const yY=yuzde(aday.puanDetay.Y,MAKS.Y);
+  const yD=yuzde(aday.puanDetay.D,MAKS.D);
+  const yK=yuzde(aday.puanDetay.K,MAKS.K);
+  const yE=yuzde(aday.puanDetay.E,MAKS.E);
+  const yuzdes=[yD,yY,yK,yE];
+  if(yY<40)flags.push({tip:"risk",metin:"Düşük yetkinlik"});
+  if(yD<40)flags.push({tip:"risk",metin:"Deneyim yetersiz"});
+  if(yK<50)flags.push({tip:"risk",metin:"Kariyer istikrarsızlığı"});
+  if((aday.yetkinlikler||[]).length<=2&&!aday.elendi)flags.push({tip:"risk",metin:"Yetkinlik çeşitliliği düşük"});
+  const mx=Math.max(...yuzdes),mn=Math.min(...yuzdes);
+  if(mx-mn>=50)flags.push({tip:"risk",metin:"Dengesiz profil"});
+  const den=parseInt(aday.deneyim||0);
+  if(den<=2&&(aday.pozisyon||"").toLowerCase().includes("kıdemli"))flags.push({tip:"risk",metin:"Deneyim-kıdem uyumsuzluğu"});
+  if(!aday.elendi&&aday.puan>=75&&aday.puan<=79){
+    const yetYuzde=(aday.puanDetay.Y/MAKS.Y)*100;
+    if(yetYuzde>=75)flags.push({tip:"pozitif",metin:"Yıldız eşiğine yakın"});
+    else flags.push({tip:"uyari",metin:"Yıldız eşiğine yakın — yetkinlik yetersiz"});
+  }
+  const hasRisk=flags.length>0;
+  if(yD===100)flags.push({tip:"pozitif",metin:"Deneyim maksimum"});
+  if(yY>=75&&!((aday.yetkinlikler||[]).length<=2))flags.push({tip:"pozitif",metin:"Yetkinlik güçlü"});
+  if(yK>=90)flags.push({tip:"pozitif",metin:"Kariyer istikrarlı"});
+  if((aday.yetkinlikler||[]).length>=3&&!aday.elendi)flags.push({tip:"pozitif",metin:"Geniş yetkinlik seti"});
+  if(mx-mn<=20&&!aday.elendi&&!hasRisk)flags.push({tip:"pozitif",metin:"Dengeli profil"});
+  return flags;
+}
+
 function metalikPuanStyle(isGold){
   if(!isGold) return {};
   return { background: ALTIN_TEXT_GRAD, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" };
 }
 
-function DashKart({ikon,baslik,deger,renk,alt}){
-  return(<div style={{flex:"1 1 140px",background:BG,padding:"20px 18px",boxShadow:"0 1px 2px rgba(0,0,0,0.05)",minWidth:130,fontFamily:FONT}}>
+// ─── CIRCULAR PROGRESS ───
+function CircularProgress({puan,renk,isGold,size=60}){
+  const r=(size-8)/2;const circ=2*Math.PI*r;const offset=circ-(puan/100)*circ;
+  return(
+    <div style={{position:"relative",width:size,height:size,flexShrink:0}}>
+      <svg width={size} height={size} style={{transform:"rotate(-90deg)"}}>
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="#2A2A2E" strokeWidth={4}/>
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={isGold?ALTIN_SOLID:renk} strokeWidth={4} strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round" style={{transition:"stroke-dashoffset 0.6s ease"}}/>
+      </svg>
+      <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+        <span style={{fontSize:18,fontWeight:500,letterSpacing:-1,color:isGold?undefined:renk,...metalikPuanStyle(isGold)}}>{puan}</span>
+      </div>
+    </div>
+  );
+}
+
+// ─── MINI RADAR CHART ───
+function MiniRadar({puanDetay,renk,isGold}){
+  const data=Object.entries(MAKS).map(([k,m])=>({kriter:ETIKETLER[k],value:yuzde(puanDetay[k],m),fullMark:100}));
+  const fillColor=isGold?ALTIN_SOLID:renk;
+  return(
+    <div style={{width:200,height:180}}>
+      <ResponsiveContainer width="100%" height="100%">
+        <RadarChart data={data} cx="50%" cy="50%" outerRadius={65}>
+          <PolarGrid stroke="#2A2A2E" gridType="polygon"/>
+          <PolarAngleAxis dataKey="kriter" tick={{fontSize:10,fill:"#777",fontFamily:FONT}}/>
+          <Radar dataKey="value" stroke={fillColor} fill={fillColor} fillOpacity={0.15} strokeWidth={2}/>
+        </RadarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+// ─── COMPARISON RADAR ───
+function ComparisonRadar({a,b}){
+  const data=Object.entries(MAKS).map(([k,m])=>({
+    kriter:ETIKETLER[k],
+    valueA:yuzde(a.puanDetay[k],m),
+    valueB:yuzde(b.puanDetay[k],m),
+    fullMark:100
+  }));
+  const renkA=puanRengi(a.puan,a.durum);
+  const renkB=puanRengi(b.puan,b.durum);
+  return(
+    <div style={{width:"100%",height:220,marginBottom:16}}>
+      <ResponsiveContainer width="100%" height="100%">
+        <RadarChart data={data} cx="50%" cy="50%" outerRadius={80}>
+          <PolarGrid stroke="#2A2A2E" gridType="polygon"/>
+          <PolarAngleAxis dataKey="kriter" tick={{fontSize:10,fill:"#777",fontFamily:FONT}}/>
+          <Radar name={a.isim} dataKey="valueA" stroke={a.durum==="yildiz"?ALTIN_SOLID:renkA} fill={a.durum==="yildiz"?ALTIN_SOLID:renkA} fillOpacity={0.15} strokeWidth={2}/>
+          <Radar name={b.isim} dataKey="valueB" stroke={b.durum==="yildiz"?ALTIN_SOLID:renkB} fill={b.durum==="yildiz"?ALTIN_SOLID:renkB} fillOpacity={0.15} strokeWidth={2}/>
+        </RadarChart>
+      </ResponsiveContainer>
+      <div style={{display:"flex",justifyContent:"center",gap:20,marginTop:4}}>
+        <span style={{fontSize:11,color:a.durum==="yildiz"?ALTIN_SOLID:renkA,fontWeight:600}}>{a.isim}</span>
+        <span style={{fontSize:11,color:b.durum==="yildiz"?ALTIN_SOLID:renkB,fontWeight:600}}>{b.isim}</span>
+      </div>
+    </div>
+  );
+}
+
+// ─── DASHBOARD KARTI ───
+function DashKart({ikon,baslik,deger,renk,alt,delay=0}){
+  const[hovered,setHovered]=useState(false);
+  return(<div onMouseEnter={()=>setHovered(true)} onMouseLeave={()=>setHovered(false)} style={{flex:"1 1 140px",background:BG,padding:"20px 18px",boxShadow:"0 1px 2px rgba(0,0,0,0.05)",minWidth:130,fontFamily:FONT,border:`0.5px solid ${hovered?"#3A3A3E":"transparent"}`,transform:hovered?"translateY(-2px)":"translateY(0)",transition:"all 0.15s ease",animation:`fadeSlideIn 0.4s ease ${delay}ms both`}}>
     <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>{ikon}<span style={{fontSize:10,color:"#888",textTransform:"uppercase",letterSpacing:1.5,fontWeight:700}}>{baslik}</span></div>
     <div style={{fontSize:36,fontWeight:500,color:YAZI,lineHeight:1,letterSpacing:-1}}>{deger}</div>
     {alt&&<div style={{fontSize:11,color:"#999",marginTop:6,fontWeight:500}}>{alt}</div>}
   </div>)
 }
 
+// ─── KARŞILAŞTIR MODAL ───
 function Karsilastir({adaylar,kapat}){
   const[a,b]=adaylar;const ks=Object.keys(MAKS);
   return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.7)",backdropFilter:"blur(4px)",zIndex:999,display:"flex",alignItems:"center",justifyContent:"center",padding:20,fontFamily:FONT}} onClick={kapat}>
     <div onClick={e=>e.stopPropagation()} style={{background:BG,maxWidth:700,width:"100%",maxHeight:"90vh",overflow:"auto",boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
       <div style={{background:SIYAH,color:BEYAZ,padding:"18px 24px",display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{fontSize:15,fontWeight:700,letterSpacing:.3}}>Aday Karşılaştırma</span><X size={18} style={{cursor:"pointer",opacity:.6}} onClick={kapat}/></div>
       <div style={{padding:24}}>
+        <ComparisonRadar a={a} b={b}/>
         <div style={{display:"grid",gridTemplateColumns:"1fr 70px 1fr",gap:0,textAlign:"center"}}>
           <div style={{padding:14,background:"#1A1A1E",fontWeight:700,fontSize:14,color:YAZI}}>{a.isim}</div>
           <div style={{padding:14,background:"#1E1E22",fontSize:10,color:"#999",fontWeight:700,letterSpacing:1}}>VS</div>
@@ -95,12 +197,15 @@ function Karsilastir({adaylar,kapat}){
   </div>)
 }
 
-function AdayKart({aday,acik,toggle,karsilastirSecili,karsilastirToggle,isLast}){
+// ─── ADAY KARTI ───
+function AdayKart({aday,acik,toggle,karsilastirSecili,karsilastirToggle,isLast,animDelay=0,tumAdaylar=[]}){
   const renk=puanRengi(aday.puan,aday.durum);const secili=karsilastirSecili;
   const isGold=aday.durum==="yildiz";
+  const[hovered,setHovered]=useState(false);
+  const[sorularAcik,setSorularAcik]=useState(false);
 
-  return(<div style={{backgroundColor:secili?"#1A2030":BG,boxShadow:"none",borderBottom:isLast?"none":"1px solid #1E1E22",transition:"all 0.2s ease",cursor:"pointer",fontFamily:FONT}}>
-    <div onClick={toggle} style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",padding:"16px 18px 0 18px"}}>
+  return(<div onMouseEnter={()=>setHovered(true)} onMouseLeave={()=>setHovered(false)} style={{backgroundColor:secili?"#1A2030":hovered?"#111":BG,boxShadow:"none",borderBottom:isLast?"none":"1px solid #1E1E22",transition:"all 0.15s ease",cursor:"pointer",fontFamily:FONT,animation:`fadeSlideIn 0.3s ease ${animDelay}ms both`}}>
+    <div onClick={toggle} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"16px 18px 0 18px"}}>
       <div style={{flex:1,minWidth:0}}>
         <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
           <ChevronDown size={13} color="#aaa" style={{transition:"transform 0.2s",transform:acik?"rotate(180deg)":"rotate(0)",flexShrink:0}}/>
@@ -109,13 +214,9 @@ function AdayKart({aday,acik,toggle,karsilastirSecili,karsilastirToggle,isLast})
           {aday.durum==="elendi"&&<span style={{fontSize:9,fontWeight:700,background:ZAYIF,color:BEYAZ,padding:"2px 10px",letterSpacing:.5,textTransform:"uppercase"}}>✗ Elendi</span>}
         </div>
         <div style={{fontSize:13,color:YAZI,fontWeight:600,marginTop:3,opacity:.7}}>{aday.pozisyon}{aday.elenSebep&&<span style={{color:ZAYIF,fontWeight:600}}> — {aday.elenSebep}</span>}</div>
-        <div style={{fontSize:11,color:"#999",marginTop:2,fontWeight:500}}>{aday.departman} · {aday.deneyim}</div>
+        <div style={{fontSize:11,color:"#999",marginTop:2,fontWeight:500,display:"flex",alignItems:"center",gap:8}}>{aday.departman} · {aday.deneyim}{tumAdaylar.length>0&&<span style={{fontSize:9,color:"#555",background:"#1A1A1E",padding:"1px 6px",fontWeight:600}}>{(()=>{const s=deptSiralama(aday,tumAdaylar);return `${s.sira}/${s.toplam}`})()}</span>}</div>
       </div>
-      <div style={{width:72,textAlign:"center",flexShrink:0}}>
-        <div style={{fontSize:30,fontWeight:500,color:isGold?undefined:renk,lineHeight:1,letterSpacing:-1,...metalikPuanStyle(isGold)}}>{aday.puan}</div>
-        <div style={{width:50,margin:"6px auto",height:3,background:"#2A2A2E",borderRadius:2,overflow:"hidden"}}><div style={{width:`${aday.puan}%`,height:"100%",background:isGold?ALTIN_GRAD:renk,borderRadius:2}}/></div>
-        <div style={{fontSize:9,color:"#aaa",lineHeight:"12px",fontWeight:500}}>{Object.entries(aday.puanDetay).map(([k,v])=>`${k}:${yuzde(v,MAKS[k])}`).join(" ")}</div>
-      </div>
+      <CircularProgress puan={aday.puan} renk={renk} isGold={isGold}/>
     </div>
     {!acik && <div onClick={toggle} style={{padding:"6px 18px 12px 18px"}}><div style={{fontSize:12,color:"#888",lineHeight:"18px",fontWeight:400}}>{ozetKisa(aday.ozet)}</div></div>}
     {acik&&(<div>
@@ -125,19 +226,69 @@ function AdayKart({aday,acik,toggle,karsilastirSecili,karsilastirToggle,isLast})
       </div>
       <div style={{padding:"10px 18px 16px 18px"}}>
         <div style={{display:"flex",gap:20,marginTop:4,flexWrap:"wrap"}}>
-          <div style={{flex:1,minWidth:180}}><div style={{fontSize:11,color:"#BBBBBB",textTransform:"uppercase",letterSpacing:1.5,marginBottom:8,fontWeight:700}}>İletişim</div><div style={{fontSize:12,color:"#BBBBBB",lineHeight:"24px"}}><div style={{display:"flex",alignItems:"center",gap:8}}><Phone size={11} color="#bbb"/>{aday.telefon}</div><div style={{display:"flex",alignItems:"center",gap:8}}><Mail size={11} color="#bbb"/><a href={`mailto:${aday.email}`} style={{color:YAZI,textDecoration:"underline",textUnderlineOffset:2}}>{aday.email}</a></div></div></div>
-          <div style={{flex:1,minWidth:180}}><div style={{fontSize:11,color:"#BBBBBB",textTransform:"uppercase",letterSpacing:1.5,marginBottom:8,fontWeight:700}}>Yetkinlikler</div><div style={{display:"flex",gap:5,flexWrap:"wrap"}}>{(aday.yetkinlikler||[]).map((y,i)=>(<span key={i} style={{background:"#1E1E22",color:YAZI,fontSize:11,padding:"4px 12px",fontWeight:500}}>{y}</span>))}</div></div>
+          <div style={{flex:1,minWidth:180}}>
+            <div style={{fontSize:11,color:"#BBBBBB",textTransform:"uppercase",letterSpacing:1.5,marginBottom:8,fontWeight:700}}>İletişim</div>
+            <div style={{fontSize:12,color:"#BBBBBB",lineHeight:"24px"}}>
+              <div style={{display:"flex",alignItems:"center",gap:8}}><Phone size={11} color="#bbb"/>{aday.telefon}</div>
+              <div style={{display:"flex",alignItems:"center",gap:8}}><Mail size={11} color="#bbb"/><a href={`mailto:${aday.email}`} style={{color:YAZI,textDecoration:"underline",textUnderlineOffset:2}}>{aday.email}</a></div>
+            </div>
+          </div>
+          <div style={{flex:1,minWidth:180}}>
+            <div style={{fontSize:11,color:"#BBBBBB",textTransform:"uppercase",letterSpacing:1.5,marginBottom:8,fontWeight:700}}>Yetkinlikler</div>
+            <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>{(aday.yetkinlikler||[]).map((y,i)=>(<span key={i} style={{background:"#1E1E22",color:YAZI,fontSize:11,padding:"4px 12px",fontWeight:500}}>{y}</span>))}</div>
+          </div>
         </div>
-        <div style={{marginTop:14}}><div style={{fontSize:11,color:"#BBBBBB",textTransform:"uppercase",letterSpacing:1.5,marginBottom:10,fontWeight:700}}>Puan Dağılımı</div><div style={{display:"flex",gap:10,flexWrap:"wrap"}}>{Object.entries(aday.puanDetay).map(([k,v])=>{const y=yuzde(v,MAKS[k]);return(<div key={k} style={{flex:1,minWidth:100}}><div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#777",marginBottom:4,fontWeight:500}}><span>{ETIKETLER[k]}</span><span style={{fontWeight:700,color:barRengi(y)}}>%{y}</span></div><div style={{height:5,background:"#2A2A2E",borderRadius:3,overflow:"hidden"}}><div style={{width:`${y}%`,height:"100%",background:barRengi(y),borderRadius:3,transition:"width 0.5s ease"}}/></div></div>)})}</div></div>
-        <div style={{marginTop:16,display:"flex",alignItems:"center",gap:16}}>
-          <a href={aday.cvLink} target="_blank" rel="noopener noreferrer" onClick={e=>e.stopPropagation()} style={{display:"inline-flex",alignItems:"center",gap:5,fontSize:11,fontWeight:500,color:"#999",textDecoration:"none",letterSpacing:.3,fontFamily:FONT}}>CV →</a>
-          <button onClick={e=>{e.stopPropagation();karsilastirToggle(aday)}} style={{display:"inline-flex",alignItems:"center",gap:5,background:"none",color:secili?TURUNCU:"#999",fontSize:11,fontWeight:500,padding:0,border:"none",cursor:"pointer",letterSpacing:.3,fontFamily:FONT}}><GitCompare size={11}/> {secili?"Seçildi":"Karşılaştır"}</button>
+        <div style={{marginTop:14,display:"flex",gap:16,flexWrap:"wrap",alignItems:"flex-start"}}>
+          <div style={{flex:"1 1 280px"}}>
+            <div style={{fontSize:11,color:"#BBBBBB",textTransform:"uppercase",letterSpacing:1.5,marginBottom:8,fontWeight:700}}>Puan Dağılımı</div>
+            {Object.entries(aday.puanDetay).map(([k,v])=>{const y=yuzde(v,MAKS[k]);return(
+              <div key={k} style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
+                <span style={{fontSize:11,color:"#777",fontWeight:500,width:90,flexShrink:0}}>{ETIKETLER[k]}</span>
+                <div style={{flex:1,height:6,background:"#2A2A2E",borderRadius:3,overflow:"hidden"}}><div style={{width:`${y}%`,height:"100%",background:barRengi(y),borderRadius:3,transition:"width 0.5s ease"}}/></div>
+                <span style={{fontSize:11,fontWeight:700,color:barRengi(y),width:36,textAlign:"right",flexShrink:0}}>{v}/{MAKS[k]}</span>
+                <span style={{fontSize:10,color:"#555",width:30,textAlign:"right",flexShrink:0}}>%{y}</span>
+              </div>
+            )})}
+          </div>
+          <MiniRadar puanDetay={aday.puanDetay} renk={renk} isGold={isGold}/>
+        </div>
+        {/* Risk Bayrakları */}
+        {(()=>{const flags=riskBayraklari(aday);return flags.length>0?(
+          <div style={{marginTop:14,display:"flex",gap:6,flexWrap:"wrap"}}>
+            {flags.map((f,i)=>(
+              <span key={i} style={{fontSize:10,fontWeight:600,padding:"3px 10px",letterSpacing:.3,background:f.tip==="pozitif"?"#0D3320":f.tip==="uyari"?"#332D0D":"#331414",color:f.tip==="pozitif"?GUCLU:f.tip==="uyari"?ORTA:ZAYIF}}>
+                {f.tip==="pozitif"?"▲":"⚠"} {f.metin}
+              </span>
+            ))}
+          </div>
+        ):null})()}
+        {/* Mülakat Soruları Dropdown */}
+        {aday.mulakatSorulari&&aday.mulakatSorulari.length>0&&(
+          <div style={{marginTop:16}}>
+            <button onClick={e=>{e.stopPropagation();setSorularAcik(!sorularAcik)}} style={{display:"flex",alignItems:"center",gap:6,background:"none",border:"none",cursor:"pointer",fontSize:12,color:"#999",fontWeight:600,padding:0,fontFamily:FONT}}>
+              <ChevronDown size={13} color="#aaa" style={{transform:sorularAcik?"rotate(180deg)":"rotate(0)",transition:"transform 0.2s"}}/> <MessageSquare size={13}/> Mülakat Soruları ({aday.mulakatSorulari.length})
+            </button>
+            {sorularAcik&&(
+              <div style={{marginTop:10,borderLeft:`2px solid ${TURUNCU}`,paddingLeft:14,background:"#111",padding:"12px 14px 12px 16px",borderRadius:"0 6px 6px 0"}}>
+                {aday.mulakatSorulari.map((s,i)=>(
+                  <div key={i} style={{fontSize:12,color:"#BBBBBB",lineHeight:"20px",marginBottom:i<aday.mulakatSorulari.length-1?10:0,fontWeight:400}}>
+                    <span style={{color:TURUNCU,fontWeight:700,marginRight:6}}>{i+1}.</span>{s}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+        <div style={{marginTop:16,display:"flex",alignItems:"center",gap:12}}>
+          <a href={aday.cvLink} target="_blank" rel="noopener noreferrer" onClick={e=>e.stopPropagation()} style={{display:"inline-flex",alignItems:"center",gap:5,fontSize:11,fontWeight:600,color:YAZI,textDecoration:"none",padding:"6px 14px",background:"#1A1A1E",border:"0.5px solid #2A2A2E",letterSpacing:.3,fontFamily:FONT,transition:"border-color 0.15s"}}><FileText size={12}/> CV Görüntüle</a>
+          <button onClick={e=>{e.stopPropagation();karsilastirToggle(aday)}} style={{display:"inline-flex",alignItems:"center",gap:5,fontSize:11,fontWeight:600,padding:"6px 14px",border:secili?`0.5px solid ${TURUNCU}`:"0.5px solid #2A2A2E",background:secili?"#1A1208":BG,color:secili?TURUNCU:"#999",cursor:"pointer",letterSpacing:.3,fontFamily:FONT,transition:"all 0.15s"}}><GitCompare size={12}/> {secili?"Seçildi":"Karşılaştır"}</button>
         </div>
       </div>
     </div>)}
   </div>)
 }
 
+// ─── TABLO ───
 function TabloGorunumu({adaylar}){return(<div style={{overflowX:"auto",fontFamily:FONT}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}><thead><tr style={{background:SIYAH,color:BEYAZ}}>{["Aday","Pozisyon","Departman","Den.","D","Y","K","E","Puan","Durum"].map(h=>(<th key={h} style={{padding:"11px 10px",textAlign:"left",fontSize:10,fontWeight:600,letterSpacing:.5,textTransform:"uppercase",whiteSpace:"nowrap"}}>{h}</th>))}</tr></thead><tbody>{adaylar.map((a,i)=>(<tr key={a.id} style={{background:i%2===0?BG:"#1A1A1E",borderBottom:"1px solid #1E1E22"}}><td style={{padding:10,fontWeight:600,color:YAZI}}>{a.isim}</td><td style={{padding:10,color:"#AAAAAA"}}>{a.pozisyon}</td><td style={{padding:10,color:"#777"}}>{a.departman}</td><td style={{padding:10,color:"#777"}}>{a.deneyim}</td>{Object.entries(a.puanDetay).map(([k,v])=>(<td key={k} style={{padding:10,fontWeight:600,color:barRengi(yuzde(v,MAKS[k]))}}>{v}</td>))}<td style={{padding:10,fontWeight:500,fontSize:16,color:puanRengi(a.puan,a.durum),letterSpacing:-.5,...metalikPuanStyle(a.durum==="yildiz")}}>{a.puan}</td><td style={{padding:10}}>{a.durum==="yildiz"&&<span style={{background:ALTIN_GRAD,color:SIYAH,padding:"3px 10px",fontSize:9,fontWeight:700,letterSpacing:.5}}>★ YILDIZ</span>}{a.durum==="elendi"&&<span style={{background:ZAYIF,color:BEYAZ,padding:"3px 10px",fontSize:9,fontWeight:700,letterSpacing:.5}}>✗ ELENDİ</span>}{a.durum==="gecti"&&<span style={{background:GUCLU,color:BEYAZ,padding:"3px 10px",fontSize:9,fontWeight:700,letterSpacing:.5}}>✓ GEÇTİ</span>}</td></tr>))}</tbody></table></div>)}
 
 // ─── ANA COMPONENT ───
@@ -145,8 +296,6 @@ export default function InteraktifRapor(){
   const [adaylarData, setAdaylarData] = useState([]);
   const [yukleniyor, setYukleniyor] = useState(true);
   const [hata, setHata] = useState(null);
-  
-  // YENİ: YETKİSİZ GİRİŞ KONTROLÜ
   const [yetkisizGiris, setYetkisizGiris] = useState(false);
 
   const[arama,setArama]=useState("");const[deptFiltre,setDeptFiltre]=useState("Tümü");const[durumFiltre,setDurumFiltre]=useState("Tümü");const[siralama,setSiralama]=useState("puan");const[puanAralik,setPuanAralik]=useState([0,100]);const[acikKartlar,setAcikKartlar]=useState(new Set());const[gorunum,setGorunum]=useState("kart");const[karsilastirListesi,setKarsilastirListesi]=useState([]);const[karsilastirAcik,setKarsilastirAcik]=useState(false);const[grafikAcik,setGrafikAcik]=useState(true);
@@ -154,21 +303,14 @@ export default function InteraktifRapor(){
 
   useEffect(() => { 
     document.body.style.backgroundColor = "#0A0A0A"; 
-
-    // URL'den ID parametresini yakala
     const urlParams = new URLSearchParams(window.location.search);
     const raporId = urlParams.get('id');
-
-    // ID yoksa anında kapıyı kapat
     if (!raporId) {
       setYetkisizGiris(true);
       setYukleniyor(false);
       return;
     }
-
-    // ID varsa, bunu n8n'e gönder
     const webhookUrl = `https://drkproductions.app.n8n.cloud/webhook/94a212b8-3b87-4326-a765-511364a8fc3a?id=${raporId}`;
-
     fetch(webhookUrl)
       .then((res) => {
         if (!res.ok) throw new Error("Ağ hatası");
@@ -243,7 +385,6 @@ export default function InteraktifRapor(){
     setKarsilastirListesi(p=>{const v=p.find(a=>a.id===aday.id);if(v)return p.filter(a=>a.id!==aday.id);if(p.length>=2)return[p[1],aday];return[...p,aday]})
   }
 
-  // YENİ: YETKİSİZ GİRİŞ EKRANI
   if (yetkisizGiris) {
     return (
       <div style={{ minHeight: "100vh", background: BG, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: FONT, padding: 20, textAlign: "center" }}>
@@ -277,7 +418,7 @@ export default function InteraktifRapor(){
   const CHART_H = 260;
   
   return(<div style={{maxWidth:920,margin:"0 auto",background:BG,minHeight:"100vh",fontFamily:FONT}}>
-  <style>{`@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');`}</style>
+  <style>{`@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');@keyframes fadeSlideIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}`}</style>
   
   <div style={{background:SIYAH,padding:"28px 28px 24px"}}>
   <div style={{textAlign:"center"}}>
@@ -285,22 +426,22 @@ export default function InteraktifRapor(){
   <div style={{fontSize:26,fontWeight:500,color:BEYAZ,marginTop:8,letterSpacing:-.5}}>Haftalık Aday Raporu</div>
   <div style={{fontSize:12,color:"#777",marginTop:6,fontWeight:400}}>Gizli ve Güvenli Bağlantı</div>
   </div>
-  <div style={{height:2,background:`linear-gradient(90deg, transparent, #B34D08, transparent)`,marginTop:20,borderRadius:1}}/>
+  <div style={{height:2,background:`linear-gradient(90deg, transparent, ${TURUNCU}, transparent)`,marginTop:20,borderRadius:1}}/>
   </div>
   
   <div style={{display:"flex",gap:12,padding:"20px 20px 0",flexWrap:"wrap"}}>
-  <DashKart ikon={<Users size={18} color="#555"/>} baslik="Toplam" deger={toplam} renk="#555" alt="başvuru"/>
-  <DashKart ikon={<Star size={18} color={ALTIN_SOLID}/>} baslik="Yıldız" deger={yildizSayisi} renk={ALTIN_SOLID} alt={toplam>0?`%${Math.round(yildizSayisi/toplam*100)} oran`:"%0 oran"}/>
-  <DashKart ikon={<TrendingUp size={18} color={GUCLU}/>} baslik="Geçen" deger={toplam-yildizSayisi-elenSayisi} renk={GUCLU} alt={toplam>0?`%${Math.round((toplam-yildizSayisi-elenSayisi)/toplam*100)} oran`:"%0 oran"}/>
-  <DashKart ikon={<UserX size={18} color={ZAYIF}/>} baslik="Elenen" deger={elenSayisi} renk={ZAYIF} alt={toplam>0?`%${Math.round(elenSayisi/toplam*100)} oran`:"%0 oran"}/>
-  <DashKart ikon={<BarChart3 size={18} color="#777"/>} baslik="Ort. Puan" deger={ortPuan} renk="#777" alt="/100"/>
+  <DashKart ikon={<Users size={18} color="#555"/>} baslik="Toplam" deger={toplam} renk="#555" alt="başvuru" delay={0}/>
+  <DashKart ikon={<Star size={18} color={ALTIN_SOLID}/>} baslik="Yıldız" deger={yildizSayisi} renk={ALTIN_SOLID} alt={toplam>0?`%${Math.round(yildizSayisi/toplam*100)} oran`:"%0 oran"} delay={80}/>
+  <DashKart ikon={<TrendingUp size={18} color={GUCLU}/>} baslik="Geçen" deger={toplam-yildizSayisi-elenSayisi} renk={GUCLU} alt={toplam>0?`%${Math.round((toplam-yildizSayisi-elenSayisi)/toplam*100)} oran`:"%0 oran"} delay={160}/>
+  <DashKart ikon={<UserX size={18} color={ZAYIF}/>} baslik="Elenen" deger={elenSayisi} renk={ZAYIF} alt={toplam>0?`%${Math.round(elenSayisi/toplam*100)} oran`:"%0 oran"} delay={240}/>
+  <DashKart ikon={<BarChart3 size={18} color="#777"/>} baslik="Ort. Puan" deger={ortPuan} renk="#777" alt="/100" delay={320}/>
   </div>
   
   <div style={{padding:"16px 20px 0",display:"flex",justifyContent:"flex-start",alignItems:"center"}}>
   <button onClick={()=>setGrafikAcik(!grafikAcik)} style={{display:"flex",alignItems:"center",gap:6,background:"none",border:"none",cursor:"pointer",fontSize:12,color:"#888",fontWeight:600,padding:0,fontFamily:FONT}}>
   <BarChart3 size={14}/>{grafikAcik?"Grafikleri Gizle":"Grafikleri Göster"}<ChevronDown size={12} style={{transform:grafikAcik?"rotate(180deg)":"rotate(0)",transition:"transform 0.2s"}}/>
   </button></div>
-  {grafikAcik&&(<div style={{display:"flex",gap:12,padding:"10px 20px 0",flexWrap:"wrap"}}>
+  {grafikAcik&&(<div style={{display:"flex",gap:12,padding:"10px 20px 0",flexWrap:"wrap",animation:"fadeSlideIn 0.3s ease both"}}>
   
   <div style={{flex:"1 1 320px",background:BG,padding:20,boxShadow:"0 1px 2px rgba(0,0,0,0.04)",display:"flex",flexDirection:"column"}}>
   <div style={{fontSize:15,fontWeight:700,color:YAZI,marginBottom:2,letterSpacing:-.3}}>Departman Dağılımı</div>
@@ -356,7 +497,7 @@ export default function InteraktifRapor(){
   <span style={{fontSize:11,color:"#999",whiteSpace:"nowrap",minWidth:80,fontWeight:600}}>Puan: {puanAralik[0]}–{puanAralik[1]}</span>
   <div style={{flex:1,position:"relative",height:32}}>
   <div style={{position:"absolute",top:14,left:0,right:0,height:4,background:"#2A2A2E"}}/>
-  <div style={{position:"absolute",top:14,left:`${puanAralik[0]}%`,width:`${puanAralik[1]-puanAralik[0]}%`,height:4,background:(puanAralik[0]===0&&puanAralik[1]===100)?"#2A2A2E":"#B34D08"}}/>
+  <div style={{position:"absolute",top:14,left:`${puanAralik[0]}%`,width:`${puanAralik[1]-puanAralik[0]}%`,height:4,background:(puanAralik[0]===0&&puanAralik[1]===100)?"#2A2A2E":TURUNCU}}/>
   <input type="range" min={0} max={100} value={puanAralik[0]} onChange={e=>{const v=Math.min(+e.target.value,puanAralik[1]-1);setPuanAralik([v,puanAralik[1]])}} className="rng" style={{position:"absolute",top:0,left:0,width:"100%",height:"100%",zIndex:puanAralik[0]>50?5:3}}/>
   <input type="range" min={0} max={100} value={puanAralik[1]} onChange={e=>{const v=Math.max(+e.target.value,puanAralik[0]+1);setPuanAralik([puanAralik[0],v])}} className="rng" style={{position:"absolute",top:0,left:0,width:"100%",height:"100%",zIndex:puanAralik[1]<=50?5:4}}/>
   <style>{`.rng{-webkit-appearance:none;appearance:none;background:transparent;pointer-events:none;margin:0;cursor:pointer}.rng::-webkit-slider-runnable-track{height:32px;background:transparent}.rng::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:#0A0A0A;border:2px solid #555;box-shadow:none;margin-top:7px;pointer-events:auto;cursor:grab}.rng::-webkit-slider-thumb:active{cursor:grabbing;transform:scale(1.15);border-color:#888}.rng::-moz-range-track{height:32px;background:transparent;border:none}.rng::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:#0A0A0A;border:2px solid #555;box-shadow:none;pointer-events:auto;cursor:grab}`}</style>
@@ -368,7 +509,7 @@ export default function InteraktifRapor(){
   <div style={{padding:"14px 20px 6px",fontSize:11,color:"#999",fontWeight:500}}>{filtrelenmis.length} / {toplam} aday gösteriliyor</div>
   
   <div style={{padding:"0 20px 10px"}}>
-  {gorunum==="kart"?grupla(filtrelenmis).map((g,gi)=>{const isGoldGrp=g.renk==="yildiz";return(<div key={gi} style={{display:"flex",marginBottom:10}}><div style={{width:5,flexShrink:0,background:isGoldGrp?ALTIN_BORDER_GRAD:g.renk,borderRadius:"1px"}}/><div style={{flex:1}}>{g.adaylar.map((a,ai)=>(<AdayKart key={a.id} aday={a} acik={acikKartlar.has(a.id)} toggle={()=>setAcikKartlar(p=>{const n=new Set(p);n.has(a.id)?n.delete(a.id):n.add(a.id);return n})} karsilastirSecili={!!karsilastirListesi.find(x=>x.id===a.id)} karsilastirToggle={karsilastirToggle} isLast={ai===g.adaylar.length-1}/>))}</div></div>)}):(<div style={{background:BG,overflow:"hidden",boxShadow:"0 1px 2px rgba(0,0,0,0.04)"}}><TabloGorunumu adaylar={filtrelenmis}/></div>)}
+  {gorunum==="kart"?grupla(filtrelenmis).map((g,gi)=>{const isGoldGrp=g.renk==="yildiz";let cardIdx=0;return(<div key={gi} style={{display:"flex",marginBottom:10}}><div style={{width:5,flexShrink:0,background:isGoldGrp?ALTIN_BORDER_GRAD:g.renk,borderRadius:"1px"}}/><div style={{flex:1}}>{g.adaylar.map((a,ai)=>{const idx=cardIdx++;return(<AdayKart key={a.id} aday={a} acik={acikKartlar.has(a.id)} toggle={()=>setAcikKartlar(p=>{const n=new Set(p);n.has(a.id)?n.delete(a.id):n.add(a.id);return n})} karsilastirSecili={!!karsilastirListesi.find(x=>x.id===a.id)} karsilastirToggle={karsilastirToggle} isLast={ai===g.adaylar.length-1} animDelay={idx*50} tumAdaylar={adaylarData}/>)})}</div></div>)}):(<div style={{background:BG,overflow:"hidden",boxShadow:"0 1px 2px rgba(0,0,0,0.04)"}}><TabloGorunumu adaylar={filtrelenmis}/></div>)}
   {filtrelenmis.length===0&&(<div style={{textAlign:"center",padding:48,color:"#bbb",fontSize:14,fontWeight:500}}>Kriterlere uygun aday bulunamadı.</div>)}
   </div>
   
@@ -383,8 +524,10 @@ export default function InteraktifRapor(){
     <span style={{fontSize:10,color:"#AAAAAA",fontWeight:500}}><strong style={{color:"#777"}}>E:</strong> Eğitim</span>
   </div>
   <div style={{fontSize:10,color:"#AAAAAA",lineHeight:"17px",fontWeight:400}}>Bu rapor <strong style={{color:"#777"}}>Phantom Intelligence</strong> tarafından otomatik oluşturulmuştur.</div>
-  <div style={{fontSize:10,color:"#B34D08",lineHeight:"17px",marginTop:4,fontWeight:500,opacity:.8}}>Ön değerlendirme puanları tavsiye niteliğindedir — nihai mülakat kararı İK ekibine aittir.</div>
+  <div style={{fontSize:10,color:TURUNCU,lineHeight:"17px",marginTop:4,fontWeight:500,opacity:.8}}>Ön değerlendirme puanları tavsiye niteliğindedir — nihai mülakat kararı İK ekibine aittir.</div>
   </div>
   
   {karsilastirAcik&&karsilastirListesi.length===2&&<Karsilastir adaylar={karsilastirListesi} kapat={()=>setKarsilastirAcik(false)}/>}
   </div>)}
+
+}

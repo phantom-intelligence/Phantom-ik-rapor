@@ -41,7 +41,8 @@ function borderRengi(a){
   if(a.durum==="yildiz") return "yildiz";
   if(a.durum==="elendi") return ZAYIF;
   if(a.puan>=60) return GUCLU;
-  return ORTA;
+  if(a.puan>=40) return ORTA;
+  return ZAYIF;
 }
 function grupla(adaylar){
   const groups=[];let cur=null;
@@ -429,7 +430,7 @@ export default function InteraktifRapor(){
   <div style={{height:2,background:`linear-gradient(90deg, transparent, ${TURUNCU}, transparent)`,marginTop:20,borderRadius:1}}/>
   </div>
   
-  <div style={{display:"flex",gap:12,padding:"20px 20px 0",flexWrap:"wrap"}}>
+  <div style={{display: "flex", gap: 12, padding: "20px 20px 0", flexWrap: "wrap"}}>
   <DashKart ikon={<Users size={18} color="#555"/>} baslik="Toplam" deger={toplam} renk="#555" alt="başvuru" delay={0}/>
   <DashKart ikon={<Star size={18} color={ALTIN_SOLID}/>} baslik="Yıldız" deger={yildizSayisi} renk={ALTIN_SOLID} alt={toplam>0?`%${Math.round(yildizSayisi/toplam*100)} oran`:"%0 oran"} delay={80}/>
   <DashKart ikon={<TrendingUp size={18} color={GUCLU}/>} baslik="Geçen" deger={toplam-yildizSayisi-elenSayisi} renk={GUCLU} alt={toplam>0?`%${Math.round((toplam-yildizSayisi-elenSayisi)/toplam*100)} oran`:"%0 oran"} delay={160}/>

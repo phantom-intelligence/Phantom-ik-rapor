@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { ChevronDown, BarChart3, LayoutGrid, Table, GitCompare, X, ExternalLink, Phone, Mail, Search, Users, Star, TrendingUp, UserX, Loader2, Lock, MessageSquare, FileText } from "lucide-center";
+import { ChevronDown, BarChart3, LayoutGrid, Table, GitCompare, X, ExternalLink, Phone, Mail, Search, Users, Star, TrendingUp, UserX, Loader2, Lock, MessageSquare, FileText } from "lucide-react";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis } from "recharts";
 
 // ─── BRANDING ───
@@ -528,6 +528,5 @@ export default function InteraktifRapor(){
   </div>
   
   {karsilastirAcik&&karsilastirListesi.length===2&&<Karsilastir adaylar={karsilastirListesi} kapat={()=>setKarsilastirAcik(false)}/>}
-  </div>)}
-
+  </div>);
 }

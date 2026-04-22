@@ -12,7 +12,7 @@ import {
 
 // 🔌 SUPABASE MOTOR BAĞLANTISI (EKLENDİ)
 const supabaseUrl = 'https://qrwqjitxdzouyaluhabh.supabase.co'; 
-const supabaseKey = 'BURAYA_FOTOGRAFTAKI_ANON_PUBLIC_KEY_GELECEK'; 
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFyd3FqaXR4ZHpvdXlhbHVoYWJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxODk5MjIsImV4cCI6MjA5MTc2NTkyMn0.6U7X8o-0w8EdJTNYZTx-LejFVboYHZo6mHpBZjWu-p8'; 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // ═══════════════════════════════════════════════════════════

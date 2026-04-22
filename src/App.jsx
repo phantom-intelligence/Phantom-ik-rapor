@@ -740,19 +740,18 @@ export default function InteraktifRapor() {
       return; 
     }
 
-    // 🚀 YENİ SUPABASE VERİ ÇEKME MOTORU (EKLENDİ)
+    // 🚀 YENİ SUPABASE VERİ ÇEKME MOTORU
     const fetchAdaylar = async () => {
       try {
         const { data, error } = await supabase
           .from('cvera_adaylar')
           .select('*')
-          .eq('rapor_id', raporId); // Sadece linkteki ID'ye ait adayları getirir
+          .eq('sirket_id', raporId); // 👈 BURASI DEĞİŞTİ: Artık sirket_id'ye bakıyor!
 
         if (error) throw error;
 
         if (data && data.length > 0) {
           const formatli = data.map((row) => {
-            // Supabase'den gelen JSON string verisini React objesine çeviriyoruz
             let pd = {};
             try { pd = typeof row.puan_detay === 'string' ? JSON.parse(row.puan_detay) : (row.puan_detay || {}); } catch(e) {}
             
@@ -763,10 +762,9 @@ export default function InteraktifRapor() {
                 yetkinliklerArr = row.temel_yetkinlikler;
             }
 
-            // Vercel'in beklediği isimlere tam eşleştirme (Mapping)
             const guvenliAday = {
               id: row.id,
-              isim: row.aday_adi || 'Bilinmeyen Aday',
+              isim: row.ad_soyad || 'Bilinmeyen Aday', // 👈 BURASI DEĞİŞTİ: ad_soyad eklendi
               pozisyon: row.hedef_pozisyon || '',
               departman: row.departman || 'Belirtilmemiş',
               deneyim: row.toplam_deneyim || '',
@@ -776,14 +774,14 @@ export default function InteraktifRapor() {
                 K: Number(pd.kariyer_istikrari || pd.K || 0),
                 E: Number(pd.egitim_uyumu || pd.E || 0)
               },
-              puan: Number(row.ai_puani || 0),
+              puan: Number(row.ai_puan || 0), // 👈 BURASI DEĞİŞTİ: ai_puan eklendi
               durum: (row.on_eleme || row.cift_kontrol_durumu || '').toLowerCase().includes('elendi') ? 'elendi' : 'gecti',
               ozet: row.yonetici_ozeti || '',
-              telefon: row.telefon || row.iletisim_bilgileri?.telefon || '',
-              email: row.email || row.iletisim_bilgileri?.email || '',
+              telefon: row.iletisim_bilgileri?.telefon || row.telefon || '',
+              email: row.iletisim_bilgileri?.email || row.email || '',
               yetkinlikler: yetkinliklerArr,
               cvLink: row.cv_linki || '',
-              mulakatSorulari: row.mulakat_sorulari || [] // 🚀 Mülakat soruları eklendi
+              mulakatSorulari: row.mulakat_sorulari || []
             };
 
             const isY = isYildiz(guvenliAday);
@@ -803,7 +801,7 @@ export default function InteraktifRapor() {
         setYukleniyor(false);
       }
     };
-
+  
     fetchAdaylar();
   }, []);
 

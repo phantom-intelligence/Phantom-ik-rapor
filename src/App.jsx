@@ -1,9 +1,9 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useLayoutEffect, useRef } from "react";
 import { createClient } from '@supabase/supabase-js'; // 🚀 EKLENDİ: Supabase Kütüphanesi
 import {
   ChevronDown, BarChart3, LayoutGrid, Table, GitCompare, X,
   Phone, Mail, Search, Users, Star, TrendingUp, UserX,
-  Loader2, Lock, MessageSquare, FileText,
+  Loader2, Lock, MessageSquare, FileText, Sun, Moon,
 } from "lucide-react";
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip,
@@ -16,34 +16,46 @@ const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // ═══════════════════════════════════════════════════════════
-//  DESIGN TOKENS (website aligned)
+//  DESIGN TOKENS — locked to phantomintelligence.ai globals.css
+//  Theme-variant values use CSS custom properties (see globalStyles
+//  below for [data-theme="dark"] and [data-theme="light"] definitions).
+//  Theme-invariant values (accent, status, gold) use literals directly.
 // ═══════════════════════════════════════════════════════════
 const T = {
-  bg: "#080A07",
-  surface: "#000000",
-  surfaceRaised: "#0E110D",
-  text: "#F5F4F1",
-  textDim: "rgba(245,244,241,0.88)",
-  muted: "#878A80",
-  faint: "#5C5F58",
-  border: "rgba(245,244,241,0.06)",
-  borderStrong: "rgba(245,244,241,0.12)",
-  borderAccent: "rgba(217,91,0,0.22)",
-  borderAccentStrong: "rgba(217,91,0,0.4)",
+  // Surfaces — theme-variant
+  bg: "var(--bg)",
+  surface: "var(--surface)",
+  surfaceRaised: "var(--surface-raised)",
+  // Text — theme-variant
+  text: "var(--text)",
+  textDim: "var(--text-dim)",
+  muted: "var(--muted)",
+  faint: "var(--faint)",
+  // Borders — theme-variant
+  border: "var(--border)",
+  borderStrong: "var(--border-strong)",
+  borderAccent: "var(--border-accent)",
+  borderAccentStrong: "var(--border-accent-strong)",
+  // Accent — literal (invariant; same in both themes by brand spec)
   accent: "#D95B00",
-  accentBright: "#FF7A1F",
-  accentGlow: "rgba(217,91,0,0.08)",
-  // Status — kept for data viz (information carrying)
-  strong: "#16A34A",
-  strongDim: "rgba(22,163,74,0.12)",
-  medium: "#D97706",
-  mediumDim: "rgba(217,119,6,0.12)",
-  weak: "#B45350",
-  weakDim: "rgba(180,83,80,0.1)",
-  // Star gold — kept for score, score-only
-  goldSolid: "#D4AF37",
-  goldGrad: "linear-gradient(135deg, #CFAD58, #EED18D, #B88E33)",
-  goldTextGrad: "linear-gradient(135deg, #BF953F 0%, #FCF6BA 25%, #B38728 50%, #FBF5B7 75%, #AA771C 100%)",
+  accentBright: "var(--accent-bright)",
+  accentGlow: "var(--accent-glow)",
+  accentGlowStrong: "var(--accent-glow-strong)",
+  // Status — theme-variant (darker variants in light for WCAG AA contrast)
+  strong: "var(--status-strong)",
+  strongDim: "var(--status-strong-dim)",
+  medium: "var(--status-medium)",
+  mediumDim: "var(--status-medium-dim)",
+  weak: "var(--status-weak)",
+  weakDim: "var(--status-weak-dim)",
+  // Star gold — theme-variant (legible on both cream and warm-black)
+  goldSolid: "var(--status-gold)",
+  goldGrad: "var(--gold-grad)",
+  goldTextGrad: "var(--gold-text-grad)",
+  goldBadgeFg: "var(--gold-badge-fg)",
+  // Premium card elevation — theme-variant (dark needs deep shadow, light needs soft)
+  cardShadow: "var(--card-shadow)",
+  cardShadowHover: "var(--card-shadow-hover)",
 };
 
 const MAKS = { D: 25, Y: 40, K: 20, E: 15 };
@@ -176,7 +188,8 @@ function DotAccent() {
   return <span style={{ color: T.accent, marginLeft: 1 }}>.</span>;
 }
 
-// Mini phantom/intelligence breath logo — mount reveal + hover pulse
+// phantom / intelligence wordmark — brand spec: phantom (Bricolage) · / (Geist Mono, accent, breath) · intelligence (Geist Mono, muted)
+// Mount reveal: phantom fades in first, then slash, then intelligence. Slash breathes at 3.6s on loop.
 function PhantomBreath({ variant = "header" }) {
   const [mounted, setMounted] = useState(false);
   const [hovered, setHovered] = useState(false);
@@ -187,7 +200,6 @@ function PhantomBreath({ variant = "header" }) {
   }, []);
 
   const size = variant === "header" ? 12 : 10;
-  const color = T.muted;
 
   return (
     <span
@@ -195,43 +207,54 @@ function PhantomBreath({ variant = "header" }) {
       onMouseLeave={() => setHovered(false)}
       style={{
         display: "inline-flex",
-        alignItems: "center",
-        gap: 4,
-        fontFamily: F_MONO,
+        alignItems: "baseline",
+        gap: 0,
         fontSize: size,
-        letterSpacing: "0.04em",
-        color,
         cursor: "default",
       }}
     >
+      {/* phantom — Bricolage, text color */}
       <span
         style={{
           display: "inline-block",
-          color: T.accent,
-          fontWeight: 600,
-          transform: mounted ? "skewX(-15deg) translateX(0)" : "skewX(-15deg) translateX(-4px)",
-          opacity: mounted ? 1 : 0,
-          transition: "transform 0.55s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.55s ease",
-          filter: hovered ? "drop-shadow(0 0 4px rgba(217,91,0,0.6))" : "none",
-          margin: "0 2px",
-        }}
-      >
-        /
-      </span>
-      <span
-        style={{
-          display: "inline-block",
+          fontFamily: F_DISPLAY,
+          fontWeight: 500,
+          letterSpacing: "-0.02em",
+          color: T.text,
+          fontVariationSettings: '"opsz" 32',
           opacity: mounted ? 1 : 0,
           transform: mounted ? "translateX(0)" : "translateX(-3px)",
-          transition: "opacity 0.6s ease 0.15s, transform 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.15s",
+          transition: "opacity 0.6s ease, transform 0.6s cubic-bezier(0.22, 1, 0.36, 1)",
         }}
       >
         phantom
       </span>
+      {/* / — Geist Mono, accent, breathing */}
       <span
         style={{
           display: "inline-block",
-          opacity: mounted ? 0.75 : 0,
+          fontFamily: F_MONO,
+          fontWeight: 600,
+          color: T.accent,
+          margin: "0 0.2em",
+          textShadow: `0 0 10px ${T.accentGlowStrong}`,
+          opacity: mounted ? 1 : 0,
+          transition: "opacity 0.55s ease 0.15s",
+          animation: mounted ? "slashBreath 3.6s ease-in-out infinite" : "none",
+          filter: hovered ? "drop-shadow(0 0 6px rgba(217,91,0,0.7))" : "none",
+        }}
+      >
+        /
+      </span>
+      {/* intelligence — Geist Mono, muted */}
+      <span
+        style={{
+          display: "inline-block",
+          fontFamily: F_MONO,
+          fontWeight: 400,
+          letterSpacing: "0.01em",
+          color: T.muted,
+          opacity: mounted ? 1 : 0,
           transform: mounted ? "translateX(0)" : "translateX(-3px)",
           transition: "opacity 0.6s ease 0.3s, transform 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.3s",
         }}
@@ -316,6 +339,7 @@ function DashKart({ num, baslik, deger, renk, alt, delta, ikon, delay = 0 }) {
         padding: "22px 20px",
         fontFamily: F_BODY,
         transform: hovered ? "translateY(-2px)" : "translateY(0)",
+        boxShadow: hovered ? T.cardShadowHover : T.cardShadow,
         transition: "all 0.3s cubic-bezier(0.22, 1, 0.36, 1)",
         animation: `fadeSlideIn 0.5s ease ${delay}ms both`,
         position: "relative",
@@ -356,7 +380,7 @@ function Karsilastir({ adaylar, kapat }) {
     <div
       style={{
         position: "fixed", inset: 0,
-        background: "rgba(8,10,7,0.78)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)",
+        background: "var(--modal-backdrop)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)",
         zIndex: 999, display: "flex", alignItems: "center", justifyContent: "center",
         padding: 20, fontFamily: F_BODY, animation: "fadeIn 0.25s ease",
       }}
@@ -369,7 +393,7 @@ function Karsilastir({ adaylar, kapat }) {
           border: `1px solid ${T.borderAccent}`,
           borderRadius: 20,
           maxWidth: 720, width: "100%", maxHeight: "90vh", overflow: "auto",
-          boxShadow: "0 30px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(217,91,0,0.05)",
+          boxShadow: "var(--modal-shadow)",
           animation: "modalSlideUp 0.35s cubic-bezier(0.22, 1, 0.36, 1)",
         }}
       >
@@ -436,14 +460,30 @@ function AdayKart({ aday, acik, toggle, karsilastirSecili, karsilastirToggle, is
   const [hovered, setHovered] = useState(false);
   const [sorularAcik, setSorularAcik] = useState(false);
   const cardRef = useRef(null);
+  const rafRef = useRef(0);
+  const pendingCoordsRef = useRef(null);
 
   function handleMouseMove(e) {
+    // rAF-throttled: writes at display refresh rate max (60/120 Hz) instead of every mouse event
     const el = cardRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
-    el.style.setProperty("--mx", `${e.clientX - rect.left}px`);
-    el.style.setProperty("--my", `${e.clientY - rect.top}px`);
+    pendingCoordsRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    if (rafRef.current) return;
+    rafRef.current = window.requestAnimationFrame(() => {
+      const coords = pendingCoordsRef.current;
+      const node = cardRef.current;
+      if (node && coords) {
+        node.style.setProperty("--mx", `${coords.x}px`);
+        node.style.setProperty("--my", `${coords.y}px`);
+      }
+      rafRef.current = 0;
+    });
   }
+
+  useEffect(() => {
+    return () => { if (rafRef.current) window.cancelAnimationFrame(rafRef.current); };
+  }, []);
 
   const sira = deptSiralama(aday, tumAdaylar);
 
@@ -484,7 +524,7 @@ function AdayKart({ aday, acik, toggle, karsilastirSecili, karsilastirToggle, is
               {aday.isim}
             </span>
             {isGold && (
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontFamily: F_MONO, fontSize: 9, fontWeight: 600, background: T.goldGrad, color: T.surface, padding: "3px 10px", letterSpacing: "0.14em", textTransform: "uppercase", borderRadius: 3, filter: "drop-shadow(0 1px 4px rgba(212,175,55,0.35))" }}>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontFamily: F_MONO, fontSize: 9, fontWeight: 600, background: T.goldGrad, color: T.goldBadgeFg, padding: "3px 10px", letterSpacing: "0.14em", textTransform: "uppercase", borderRadius: 3, filter: "drop-shadow(0 1px 4px rgba(212,175,55,0.35))" }}>
                 ★ Yıldız
               </span>
             )}
@@ -674,7 +714,7 @@ function AdayKart({ aday, acik, toggle, karsilastirSecili, karsilastirToggle, is
 // Table view
 function TabloGorunumu({ adaylar }) {
   return (
-    <div style={{ overflowX: "auto", fontFamily: F_BODY, borderRadius: 12, border: `1px solid ${T.border}` }}>
+    <div style={{ overflowX: "auto", fontFamily: F_BODY, borderRadius: 12, border: `1px solid ${T.border}`, boxShadow: T.cardShadow }}>
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
         <thead>
           <tr style={{ background: T.surfaceRaised }}>
@@ -695,7 +735,7 @@ function TabloGorunumu({ adaylar }) {
               ))}
               <td style={{ padding: 12, fontFamily: F_MONO, fontWeight: 500, fontSize: 15, color: puanRengi(a.puan, a.durum), letterSpacing: "-0.02em", fontVariantNumeric: "tabular-nums", ...metalikPuanStyle(a.durum === "yildiz") }}>{a.puan}</td>
               <td style={{ padding: 12 }}>
-                {a.durum === "yildiz" && <span style={{ fontFamily: F_MONO, background: T.goldGrad, color: T.surface, padding: "3px 10px", fontSize: 9, fontWeight: 600, letterSpacing: "0.12em", borderRadius: 3 }}>★ YILDIZ</span>}
+                {a.durum === "yildiz" && <span style={{ fontFamily: F_MONO, background: T.goldGrad, color: T.goldBadgeFg, padding: "3px 10px", fontSize: 9, fontWeight: 600, letterSpacing: "0.12em", borderRadius: 3 }}>★ YILDIZ</span>}
                 {a.durum === "elendi" && <span style={{ fontFamily: F_MONO, border: `1px solid ${T.weakDim}`, color: T.muted, padding: "3px 10px", fontSize: 9, fontWeight: 500, letterSpacing: "0.12em", borderRadius: 3 }}>× ELENDİ</span>}
                 {a.durum === "gecti" && <span style={{ fontFamily: F_MONO, border: `1px solid ${T.strongDim}`, background: T.strongDim, color: T.strong, padding: "3px 10px", fontSize: 9, fontWeight: 500, letterSpacing: "0.12em", borderRadius: 3 }}>✓ GEÇTİ</span>}
               </td>
@@ -729,8 +769,96 @@ export default function InteraktifRapor() {
   const [grafikAcik, setGrafikAcik] = useState(true);
   const [hoveredDept, setHoveredDept] = useState(null);
 
+  // ═══ THEME STATE — localStorage + prefers-color-scheme ═══
+  const THEME_KEY = "phantom-theme";
+  const [theme, setTheme] = useState(() => {
+    if (typeof document === "undefined") return "dark";
+    try {
+      const stored = localStorage.getItem(THEME_KEY);
+      if (stored === "light" || stored === "dark") return stored;
+    } catch (e) { /* localStorage unavailable */ }
+    if (typeof window !== "undefined" && window.matchMedia &&
+        window.matchMedia("(prefers-color-scheme: light)").matches) return "light";
+    return "dark";
+  });
+  const [themeTransitioning, setThemeTransitioning] = useState(false);
+  const inkOverlayRef = useRef(null);
+  const INK_WASH_MS = 1200;
+
+  // Apply data-theme attribute synchronously before paint (no flicker on first render)
+  useLayoutEffect(() => {
+    if (typeof document !== "undefined") {
+      document.documentElement.setAttribute("data-theme", theme);
+    }
+  }, [theme]);
+
+  // Persist + listen for system preference changes (only apply system change if user has no explicit choice)
   useEffect(() => {
-    document.body.style.backgroundColor = T.bg;
+    if (typeof window === "undefined") return;
+    try { localStorage.setItem(THEME_KEY, theme); } catch (e) { /* ignore */ }
+  }, [theme]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(prefers-color-scheme: light)");
+    const handler = (e) => {
+      try {
+        if (localStorage.getItem(THEME_KEY)) return; // user has explicit choice, don't auto-switch
+      } catch (err) { /* ignore */ }
+      setTheme(e.matches ? "light" : "dark");
+    };
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+
+  // Toggle with ink-wash transition (brand 1200ms wipe). Respects prefers-reduced-motion.
+  function toggleTheme() {
+    if (themeTransitioning) return;
+    const next = theme === "dark" ? "light" : "dark";
+    const reduced = typeof window !== "undefined" && window.matchMedia &&
+                    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduced) { setTheme(next); return; }
+    const overlay = inkOverlayRef.current;
+    if (!overlay) { setTheme(next); return; }
+    setThemeTransitioning(true);
+    overlay.className = "theme-ink-overlay";
+    // force reflow so animation replays cleanly
+    void overlay.offsetWidth;
+    overlay.classList.add(next === "light" ? "washing-to-light" : "washing-to-dark");
+    // flip theme at the midpoint (overlay covers viewport)
+    window.setTimeout(() => setTheme(next), INK_WASH_MS / 2);
+    // clear after wash
+    window.setTimeout(() => {
+      overlay.className = "theme-ink-overlay";
+      setThemeTransitioning(false);
+    }, INK_WASH_MS + 50);
+  }
+
+  // ═══ STICKY FILTER BAR ELEVATION (rAF-throttled scroll) ═══
+  const [filterStuck, setFilterStuck] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    let raf = 0;
+    const threshold = 200;
+    const handler = () => {
+      if (raf) return;
+      raf = window.requestAnimationFrame(() => {
+        setFilterStuck((prev) => {
+          const next = window.scrollY > threshold;
+          return prev === next ? prev : next;
+        });
+        raf = 0;
+      });
+    };
+    window.addEventListener("scroll", handler, { passive: true });
+    handler(); // initial
+    return () => {
+      window.removeEventListener("scroll", handler);
+      if (raf) window.cancelAnimationFrame(raf);
+    };
+  }, []);
+
+  useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const raporId = urlParams.get("id");
     
@@ -740,18 +868,19 @@ export default function InteraktifRapor() {
       return; 
     }
 
-    // 🚀 YENİ SUPABASE VERİ ÇEKME MOTORU
+    // 🚀 YENİ SUPABASE VERİ ÇEKME MOTORU (EKLENDİ)
     const fetchAdaylar = async () => {
       try {
         const { data, error } = await supabase
           .from('cvera_adaylar')
           .select('*')
-          .eq('sirket_id', raporId); // 👈 BURASI DEĞİŞTİ: Artık sirket_id'ye bakıyor!
+          .eq('rapor_id', raporId); // Sadece linkteki ID'ye ait adayları getirir
 
         if (error) throw error;
 
         if (data && data.length > 0) {
           const formatli = data.map((row) => {
+            // Supabase'den gelen JSON string verisini React objesine çeviriyoruz
             let pd = {};
             try { pd = typeof row.puan_detay === 'string' ? JSON.parse(row.puan_detay) : (row.puan_detay || {}); } catch(e) {}
             
@@ -762,9 +891,10 @@ export default function InteraktifRapor() {
                 yetkinliklerArr = row.temel_yetkinlikler;
             }
 
+            // Vercel'in beklediği isimlere tam eşleştirme (Mapping)
             const guvenliAday = {
               id: row.id,
-              isim: row.ad_soyad || 'Bilinmeyen Aday', // 👈 BURASI DEĞİŞTİ: ad_soyad eklendi
+              isim: row.aday_adi || 'Bilinmeyen Aday',
               pozisyon: row.hedef_pozisyon || '',
               departman: row.departman || 'Belirtilmemiş',
               deneyim: row.toplam_deneyim || '',
@@ -774,14 +904,14 @@ export default function InteraktifRapor() {
                 K: Number(pd.kariyer_istikrari || pd.K || 0),
                 E: Number(pd.egitim_uyumu || pd.E || 0)
               },
-              puan: Number(row.ai_puan || 0), // 👈 BURASI DEĞİŞTİ: ai_puan eklendi
+              puan: Number(row.ai_puani || 0),
               durum: (row.on_eleme || row.cift_kontrol_durumu || '').toLowerCase().includes('elendi') ? 'elendi' : 'gecti',
               ozet: row.yonetici_ozeti || '',
-              telefon: row.iletisim_bilgileri?.telefon || row.telefon || '',
-              email: row.iletisim_bilgileri?.email || row.email || '',
+              telefon: row.telefon || row.iletisim_bilgileri?.telefon || '',
+              email: row.email || row.iletisim_bilgileri?.email || '',
               yetkinlikler: yetkinliklerArr,
               cvLink: row.cv_linki || '',
-              mulakatSorulari: row.mulakat_sorulari || []
+              mulakatSorulari: row.mulakat_sorulari || [] // 🚀 Mülakat soruları eklendi
             };
 
             const isY = isYildiz(guvenliAday);
@@ -801,7 +931,7 @@ export default function InteraktifRapor() {
         setYukleniyor(false);
       }
     };
-  
+
     fetchAdaylar();
   }, []);
 
@@ -864,8 +994,116 @@ export default function InteraktifRapor() {
   const globalStyles = `
     @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap');
     
+    /* ═══ THEME VARIABLES — dark (default) + light ═══ */
+    :root, :root[data-theme="dark"] {
+      --bg: #0B0A06;
+      --surface: #050402;
+      --surface-raised: #070604;
+      --text: #EDEBE5;
+      --text-dim: rgba(237,235,229,0.88);
+      --muted: #8A8A82;
+      --faint: #5C5F58;
+      --border: rgba(255,255,255,0.06);
+      --border-strong: rgba(255,255,255,0.08);
+      --border-accent: rgba(217,91,0,0.25);
+      --border-accent-strong: rgba(217,91,0,0.4);
+      --accent-bright: #FF7A1F;
+      --accent-glow: rgba(217,91,0,0.08);
+      --accent-glow-strong: rgba(217,91,0,0.45);
+      --card-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 12px 32px rgba(0,0,0,0.65);
+      --card-shadow-hover: inset 0 1px 0 rgba(255,255,255,0.06), 0 16px 40px rgba(0,0,0,0.75);
+      --grain-opacity: 0.025;
+      --grain-blend: overlay;
+      --select-arrow-stroke: '%238A8A82';
+      --filter-bar-bg: rgba(11,10,6,0.72);
+      --filter-bar-shadow: 0 8px 24px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04);
+      /* Status — data viz (invariant saturation for dark) */
+      --status-strong: #16A34A;
+      --status-strong-dim: rgba(22,163,74,0.12);
+      --status-medium: #D97706;
+      --status-medium-dim: rgba(217,119,6,0.12);
+      --status-weak: #B45350;
+      --status-weak-dim: rgba(180,83,80,0.1);
+      --status-gold: #D4AF37;
+      --gold-grad: linear-gradient(135deg, #CFAD58, #EED18D, #B88E33);
+      --gold-text-grad: linear-gradient(135deg, #BF953F 0%, #FCF6BA 25%, #B38728 50%, #FBF5B7 75%, #AA771C 100%);
+      --gold-badge-fg: #050402;
+      /* Modal */
+      --modal-backdrop: rgba(8,10,7,0.78);
+      --modal-shadow: 0 30px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(217,91,0,0.05);
+    }
+    :root[data-theme="light"] {
+      --bg: #F2EDE3;
+      --surface: #E8DFD0;
+      --surface-raised: #EEE5D5;
+      --text: #0D0F0C;
+      --text-dim: rgba(13,15,12,0.82);
+      --muted: #5C5F58;
+      --faint: #A09C93;
+      --border: rgba(13,15,12,0.08);
+      --border-strong: rgba(13,15,12,0.15);
+      --border-accent: rgba(217,91,0,0.22);
+      --border-accent-strong: rgba(217,91,0,0.4);
+      --accent-bright: #B84800;
+      --accent-glow: rgba(217,91,0,0.12);
+      --accent-glow-strong: rgba(217,91,0,0.28);
+      --card-shadow: 0 4px 16px rgba(13,15,12,0.08);
+      --card-shadow-hover: 0 8px 24px rgba(13,15,12,0.12);
+      --grain-opacity: 0.045;
+      --grain-blend: multiply;
+      --select-arrow-stroke: '%235C5F58';
+      --filter-bar-bg: rgba(242,237,227,0.78);
+      --filter-bar-shadow: 0 8px 24px rgba(13,15,12,0.08), 0 0 0 1px rgba(13,15,12,0.06);
+      /* Status — WCAG AA compliant darker variants for cream bg */
+      --status-strong: #0D7A36;        /* contrast vs bg: 4.68 ✓ */
+      --status-strong-dim: rgba(13,122,54,0.14);
+      --status-medium: #A55505;        /* contrast vs bg: 4.67 ✓ */
+      --status-medium-dim: rgba(165,85,5,0.13);
+      --status-weak: #8F3835;          /* contrast vs bg: 6.41 ✓ */
+      --status-weak-dim: rgba(143,56,53,0.12);
+      --status-gold: #8E7223;          /* contrast vs bg: 4.62 ✓ */
+      --gold-grad: linear-gradient(135deg, #7E6414, #75591A, #6E5720);
+      --gold-text-grad: linear-gradient(135deg, #7D5A16 0%, #7A5E19 25%, #6E4F14 50%, #80651F 75%, #5E3F0E 100%);
+      --gold-badge-fg: #F2EDE3;
+      /* Modal — lighter backdrop + softer shadow for cream */
+      --modal-backdrop: rgba(13,15,12,0.35);
+      --modal-shadow: 0 24px 64px rgba(13,15,12,0.18), 0 0 0 1px rgba(217,91,0,0.12);
+    }
+    
     * { box-sizing: border-box; }
-    body { margin: 0; background: ${T.bg}; color: ${T.text}; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+    html, body {
+      margin: 0; background: ${T.bg}; color: ${T.text};
+      -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+      scroll-behavior: smooth;
+      transition: background-color 300ms ease, color 300ms ease;
+    }
+    body {
+      min-height: 100vh;
+      font-feature-settings: 'cv11', 'ss01', 'ss03';
+      position: relative;
+    }
+    
+    /* Grain overlay — subtle noise, fixed, non-interactive (site-wide standard) */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 1;
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.04 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+      opacity: var(--grain-opacity);
+      mix-blend-mode: var(--grain-blend);
+      transition: opacity 300ms ease;
+    }
+    body > * { position: relative; z-index: 2; }
+    
+    /* Selection — accent (brand standard) */
+    ::selection { background: ${T.accent}; color: ${T.text}; }
+    
+    /* Focus polish — keyboard only */
+    *:focus { outline: none; }
+    *:focus-visible { outline: 2px solid ${T.accent}; outline-offset: 3px; border-radius: 3px; }
+    input:focus, textarea:focus { outline: none; }
     
     @keyframes fadeSlideIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -873,6 +1111,16 @@ export default function InteraktifRapor() {
     @keyframes spin { 100% { transform: rotate(360deg); } }
     @keyframes pulse { 0%, 100% { opacity: 0.85; } 50% { opacity: 1; } }
     @keyframes pulseDot { 0%, 100% { opacity: 0.7; transform: scale(1); } 50% { opacity: 1; transform: scale(1.2); } }
+    /* Brand: slash breathes at 3.6s, subtle glow pulse */
+    @keyframes slashBreath {
+      0%, 100% { text-shadow: 0 0 8px ${T.accentGlowStrong}; opacity: 0.9; }
+      50%      { text-shadow: 0 0 14px ${T.accentGlowStrong}; opacity: 1; }
+    }
+    /* Live dot — green status indicator (reserved for future "canlı" badges) */
+    @keyframes liveDot {
+      0%, 100% { opacity: 0.85; }
+      50%      { opacity: 1; transform: scale(1.15); }
+    }
     
     /* Magnetic hover — compact version */
     .action-btn:hover {
@@ -911,10 +1159,15 @@ export default function InteraktifRapor() {
       cursor: pointer;
       appearance: none;
       -webkit-appearance: none;
-      background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%23878A80' stroke-width='1.2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
       background-repeat: no-repeat;
       background-position: right 6px center;
       transition: border-color 0.25s ease;
+    }
+    :root[data-theme="dark"] .editorial-select {
+      background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%238A8A82' stroke-width='1.2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    }
+    :root[data-theme="light"] .editorial-select {
+      background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%235C5F58' stroke-width='1.2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
     }
     .editorial-select:focus { border-bottom-color: ${T.accent}; color: ${T.text}; }
     .editorial-select option { background: ${T.surface}; color: ${T.text}; font-family: ${F_BODY}; }
@@ -934,21 +1187,117 @@ export default function InteraktifRapor() {
     .rng::-moz-range-track { height: 32px; background: transparent; border: none; }
     .rng::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: ${T.bg}; border: 1.5px solid ${T.accent}; pointer-events: auto; cursor: grab; }
     
-    /* Custom scrollbar */
-    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    /* Custom scrollbar — thin premium (site standard) */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: ${T.borderStrong}; border-radius: 4px; }
-    ::-webkit-scrollbar-thumb:hover { background: ${T.muted}; }
+    ::-webkit-scrollbar-thumb { background: ${T.borderStrong}; border-radius: 8px; transition: background 0.2s ease; }
+    ::-webkit-scrollbar-thumb:hover { background: ${T.accentGlowStrong}; }
+    * { scrollbar-width: thin; scrollbar-color: ${T.borderStrong} transparent; }
+    
+    /* Reduced motion */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
     
     /* Print mode */
     @media print {
       body { background: white !important; color: black !important; }
-      .no-print, .filter-bar, .action-btn { display: none !important; }
+      body::before { display: none !important; }
+      .no-print, .filter-bar, .action-btn, .theme-toggle { display: none !important; }
       .aday-kart { break-inside: avoid; page-break-inside: avoid; background: white !important; color: black !important; border-bottom: 1px solid #ccc !important; }
       .aday-kart * { color: black !important; }
       .dash-tile { background: white !important; border: 1px solid #ccc !important; }
       .dash-tile * { color: black !important; }
     }
+    
+    /* ═══ INK-WASH THEME TRANSITION (brand spec, 1200ms) ═══ */
+    .theme-ink-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      pointer-events: none;
+      opacity: 0;
+      transform: translateX(-110%);
+      will-change: transform, opacity;
+    }
+    .theme-ink-overlay.washing-to-light {
+      background: linear-gradient(90deg,
+        transparent 0%,
+        rgba(242,237,227,0.4) 20%,
+        rgba(242,237,227,0.95) 48%,
+        rgba(242,237,227,0.95) 52%,
+        rgba(11,10,6,0.4) 80%,
+        transparent 100%);
+      animation: inkWashForward 1200ms cubic-bezier(0.77, 0, 0.175, 1) forwards;
+    }
+    .theme-ink-overlay.washing-to-dark {
+      background: linear-gradient(90deg,
+        transparent 0%,
+        rgba(242,237,227,0.4) 20%,
+        rgba(11,10,6,0.95) 48%,
+        rgba(11,10,6,0.95) 52%,
+        rgba(242,237,227,0.4) 80%,
+        transparent 100%);
+      animation: inkWashForward 1200ms cubic-bezier(0.77, 0, 0.175, 1) forwards;
+    }
+    @keyframes inkWashForward {
+      0%   { opacity: 1; transform: translateX(-110%); }
+      50%  { opacity: 1; transform: translateX(0%); }
+      100% { opacity: 1; transform: translateX(110%); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .theme-ink-overlay { display: none !important; }
+    }
+    
+    /* ═══ THEME TOGGLE BUTTON ═══ */
+    .theme-toggle {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 36px;
+      height: 36px;
+      border-radius: 999px;
+      background: transparent;
+      border: 1px solid ${T.border};
+      color: ${T.muted};
+      cursor: pointer;
+      transition: background-color 240ms ease, border-color 240ms ease, color 240ms ease, transform 240ms ease;
+    }
+    .theme-toggle:hover {
+      background: ${T.surfaceRaised};
+      border-color: ${T.borderAccent};
+      color: ${T.accent};
+    }
+    .theme-toggle:active { transform: scale(0.94); }
+    
+    /* ═══ STICKY FILTER BAR ELEVATION (scroll-triggered) ═══ */
+    .filter-bar-inner {
+      background: ${T.bg};
+      border: 1px solid ${T.border};
+      border-radius: 16px;
+      padding: 20px 22px;
+      position: sticky;
+      top: 8px;
+      z-index: 100;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      transition: background-color 280ms ease, border-color 280ms ease, box-shadow 280ms ease;
+      will-change: background-color, box-shadow;
+    }
+    .filter-bar-inner.is-stuck {
+      background: var(--filter-bar-bg);
+      border-color: ${T.borderStrong};
+      box-shadow: var(--filter-bar-shadow);
+    }
+    
+    /* ═══ GPU HINTS ON ANIMATED SURFACES ═══ */
+    .aday-kart { will-change: background-color; }
+    .dash-tile { will-change: transform, box-shadow; }
   `;
 
   // ── UNAUTHORIZED STATE ──
@@ -1005,9 +1354,12 @@ export default function InteraktifRapor() {
     <div style={{ maxWidth: 960, margin: "0 auto", background: T.bg, minHeight: "100vh", fontFamily: F_BODY, color: T.text }}>
       <style>{globalStyles}</style>
 
+      {/* Ink-wash transition overlay (brand, 1200ms, respects reduced-motion) */}
+      <div ref={inkOverlayRef} className="theme-ink-overlay" aria-hidden="true" />
+
       {/* ═══ HEADER ═══ */}
       <header style={{ padding: "48px 28px 36px 28px", borderBottom: `1px solid ${T.border}`, position: "relative" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 16 }}>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 16 }}>
           <div>
             <SectionLabel>Haftalık Rapor</SectionLabel>
             <h1 style={{
@@ -1028,6 +1380,18 @@ export default function InteraktifRapor() {
               <span>{raporTarihi}</span>
             </div>
           </div>
+          {/* Theme toggle — aligned top-right; hidden in print */}
+          <button
+            type="button"
+            onClick={toggleTheme}
+            disabled={themeTransitioning}
+            className="theme-toggle no-print"
+            aria-label={theme === "dark" ? "Açık temaya geç" : "Koyu temaya geç"}
+            title={theme === "dark" ? "Açık tema" : "Koyu tema"}
+            style={{ marginTop: 4 }}
+          >
+            {theme === "dark" ? <Sun size={15} /> : <Moon size={15} />}
+          </button>
         </div>
       </header>
 
@@ -1061,7 +1425,7 @@ export default function InteraktifRapor() {
         {grafikAcik && (
           <div style={{ display: "flex", gap: 14, marginTop: 16, flexWrap: "wrap", animation: "fadeSlideIn 0.4s ease both" }}>
             {/* Department pie */}
-            <div style={{ flex: "1 1 340px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 16, padding: 22 }}>
+            <div style={{ flex: "1 1 340px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 16, padding: 22, boxShadow: T.cardShadow }}>
               <div style={{ fontFamily: F_DISPLAY, fontSize: 16, fontWeight: 500, color: T.text, marginBottom: 4, letterSpacing: "-0.015em" }}>
                 Departman Dağılımı
               </div>
@@ -1109,7 +1473,7 @@ export default function InteraktifRapor() {
             </div>
 
             {/* Score distribution bar */}
-            <div style={{ flex: "1 1 300px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 16, padding: 22 }}>
+            <div style={{ flex: "1 1 300px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 16, padding: 22, boxShadow: T.cardShadow }}>
               <div style={{ fontFamily: F_DISPLAY, fontSize: 16, fontWeight: 500, color: T.text, marginBottom: 4, letterSpacing: "-0.015em" }}>
                 Puan Dağılımı
               </div>
@@ -1129,14 +1493,9 @@ export default function InteraktifRapor() {
         )}
       </section>
 
-      {/* ═══ FILTERS — editorial sticky bar ═══ */}
+      {/* ═══ FILTERS — editorial sticky bar (scroll-elevated via .is-stuck) ═══ */}
       <section className="filter-bar" style={{ padding: "32px 28px 0 28px" }}>
-        <div style={{
-          background: T.bg, padding: "20px 22px", borderRadius: 16,
-          border: `1px solid ${T.border}`,
-          position: "sticky", top: 8, zIndex: 100,
-          backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
-        }}>
+        <div className={`filter-bar-inner${filterStuck ? " is-stuck" : ""}`}>
           <div style={{ display: "flex", gap: 20, flexWrap: "wrap", alignItems: "flex-end" }}>
             <div style={{ flex: "1 1 240px", position: "relative" }}>
               <Search size={13} color={T.muted} style={{ position: "absolute", left: 2, bottom: 13 }} />
@@ -1230,7 +1589,7 @@ export default function InteraktifRapor() {
             const isGoldGrp = g.renk === "yildiz";
             let cardIdx = 0;
             return (
-              <div key={gi} style={{ display: "flex", marginBottom: 14, borderRadius: 12, overflow: "hidden", border: `1px solid ${T.border}` }}>
+              <div key={gi} style={{ display: "flex", marginBottom: 14, borderRadius: 12, overflow: "hidden", border: `1px solid ${T.border}`, boxShadow: T.cardShadow }}>
                 <div style={{ width: 2, flexShrink: 0, background: isGoldGrp ? GOLD_BORDER_GRAD : g.renk, opacity: isGoldGrp ? 1 : 0.5 }} />
                 <div style={{ flex: 1, background: T.surface }}>
                   {g.adaylar.map((a, ai) => {
@@ -1293,3 +1652,4 @@ export default function InteraktifRapor() {
     </div>
   );
 }
+

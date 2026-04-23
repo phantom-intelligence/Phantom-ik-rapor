@@ -868,50 +868,51 @@ export default function InteraktifRapor() {
       return; 
     }
 
-    // 🚀 YENİ SUPABASE VERİ ÇEKME MOTORU (EKLENDİ)
+    // 🚀 SUPABASE VERİ ÇEKME MOTORU — şema: cvera_adaylar (sirket_id bazlı)
     const fetchAdaylar = async () => {
       try {
         const { data, error } = await supabase
           .from('cvera_adaylar')
           .select('*')
-          .eq('rapor_id', raporId); // Sadece linkteki ID'ye ait adayları getirir
+          .eq('sirket_id', raporId); // URL'deki ?id=... değeri artık sirket_id kolonuyla eşleşiyor
 
         if (error) throw error;
 
         if (data && data.length > 0) {
           const formatli = data.map((row) => {
-            // Supabase'den gelen JSON string verisini React objesine çeviriyoruz
+            // puan_detay JSONB — string ya da obje gelebilir
             let pd = {};
             try { pd = typeof row.puan_detay === 'string' ? JSON.parse(row.puan_detay) : (row.puan_detay || {}); } catch(e) {}
             
+            // temel_yetkinlikler virgülle ayrılmış string VEYA array olabilir
             let yetkinliklerArr = [];
             if (typeof row.temel_yetkinlikler === 'string') {
-                yetkinliklerArr = row.temel_yetkinlikler.split(',').map(s => s.trim());
+                yetkinliklerArr = row.temel_yetkinlikler.split(',').map(s => s.trim()).filter(Boolean);
             } else if (Array.isArray(row.temel_yetkinlikler)) {
                 yetkinliklerArr = row.temel_yetkinlikler;
             }
 
-            // Vercel'in beklediği isimlere tam eşleştirme (Mapping)
+            // Supabase kolonları → UI alan adları eşleştirmesi
             const guvenliAday = {
               id: row.id,
-              isim: row.aday_adi || 'Bilinmeyen Aday',
+              isim: row.ad_soyad || 'Bilinmeyen Aday',
               pozisyon: row.hedef_pozisyon || '',
               departman: row.departman || 'Belirtilmemiş',
               deneyim: row.toplam_deneyim || '',
               puanDetay: {
-                D: Number(pd.sektorel_deneyim || pd.D || 0),
-                Y: Number(pd.yetkinlik || pd.Y || 0),
-                K: Number(pd.kariyer_istikrari || pd.K || 0),
-                E: Number(pd.egitim_uyumu || pd.E || 0)
+                D: Number(pd.D || 0),
+                Y: Number(pd.Y || 0),
+                K: Number(pd.K || 0),
+                E: Number(pd.E || 0)
               },
-              puan: Number(row.ai_puani || 0),
+              puan: Number(row.ai_puan || 0),
               durum: (row.on_eleme || row.cift_kontrol_durumu || '').toLowerCase().includes('elendi') ? 'elendi' : 'gecti',
               ozet: row.yonetici_ozeti || '',
               telefon: row.telefon || row.iletisim_bilgileri?.telefon || '',
               email: row.email || row.iletisim_bilgileri?.email || '',
               yetkinlikler: yetkinliklerArr,
               cvLink: row.cv_linki || '',
-              mulakatSorulari: row.mulakat_sorulari || [] // 🚀 Mülakat soruları eklendi
+              mulakatSorulari: row.mulakat_sorulari || []
             };
 
             const isY = isYildiz(guvenliAday);

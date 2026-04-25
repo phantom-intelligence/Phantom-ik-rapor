@@ -4,6 +4,7 @@ import {
   ChevronDown, BarChart3, LayoutGrid, Table, GitCompare, X,
   Phone, Mail, Search, Users, Star, TrendingUp, UserX,
   Loader2, Lock, MessageSquare, FileText, Sun, Moon,
+  Calendar, Clock, Link2, Send, CheckCircle2, AlertCircle,
 } from "lucide-react";
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip,
@@ -14,6 +15,9 @@ import {
 const supabaseUrl = 'https://qrwqjitxdzouyaluhabh.supabase.co'; 
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFyd3FqaXR4ZHpvdXlhbHVoYWJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxODk5MjIsImV4cCI6MjA5MTc2NTkyMn0.6U7X8o-0w8EdJTNYZTx-LejFVboYHZo6mHpBZjWu-p8'; 
 const supabase = createClient(supabaseUrl, supabaseKey);
+
+// n8n webhook — interview invite endpoint
+const MULAKAT_WEBHOOK_URL = 'https://drkproductions.app.n8n.cloud/webhook/39cd8b9b-78ba-4196-beaa-33ba8ce4d82c';
 
 // ═══════════════════════════════════════════════════════════
 //  DESIGN TOKENS — locked to phantomintelligence.ai globals.css
@@ -265,6 +269,395 @@ function PhantomBreath({ variant = "header" }) {
   );
 }
 
+// ═══════════════════════════════════════════════════════════
+//  TOAST — minimal self-contained, theme-aware, auto-dismiss
+//  Usage: parent owns toast state ({tip, mesaj}); pass to <Toast/>
+// ═══════════════════════════════════════════════════════════
+function Toast({ toast, kapat }) {
+  useEffect(() => {
+    if (!toast) return;
+    const t = window.setTimeout(kapat, 4000);
+    return () => window.clearTimeout(t);
+  }, [toast, kapat]);
+
+  if (!toast) return null;
+  const isSuccess = toast.tip === "success";
+  const renk = isSuccess ? T.strong : T.weak;
+  const renkDim = isSuccess ? T.strongDim : T.weakDim;
+  const Icon = isSuccess ? CheckCircle2 : AlertCircle;
+
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="no-print"
+      style={{
+        position: "fixed",
+        top: 24,
+        right: 24,
+        zIndex: 10001,
+        minWidth: 280,
+        maxWidth: 420,
+        background: T.surface,
+        border: `1px solid ${renk}`,
+        borderRadius: 12,
+        padding: "14px 16px",
+        boxShadow: T.cardShadowHover,
+        fontFamily: F_BODY,
+        fontSize: 13,
+        color: T.text,
+        display: "flex",
+        alignItems: "flex-start",
+        gap: 12,
+        animation: "toastSlideIn 0.32s cubic-bezier(0.22, 1, 0.36, 1)",
+        backdropFilter: "blur(12px)",
+        WebkitBackdropFilter: "blur(12px)",
+      }}
+    >
+      <div style={{
+        width: 28, height: 28, flexShrink: 0,
+        borderRadius: 999, background: renkDim,
+        display: "inline-flex", alignItems: "center", justifyContent: "center",
+      }}>
+        <Icon size={16} color={renk} strokeWidth={2.4} />
+      </div>
+      <div style={{ flex: 1, lineHeight: 1.45, paddingTop: 4 }}>{toast.mesaj}</div>
+      <button
+        onClick={kapat}
+        aria-label="Bildirimi kapat"
+        style={{
+          background: "transparent", border: "none", color: T.muted,
+          cursor: "pointer", padding: 4, display: "inline-flex",
+          alignItems: "center", justifyContent: "center", borderRadius: 4,
+        }}
+      >
+        <X size={14} />
+      </button>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+//  MULAKAT DAVETI MODAL
+//  - Date picker: minimum tomorrow (today excluded per spec)
+//  - Time picker: HH:MM
+//  - Optional meeting link
+//  - POST to MULAKAT_WEBHOOK_URL with exact JSON contract
+// ═══════════════════════════════════════════════════════════
+function MulakatDavetiModal({ aday, ikMail, sirketAdi, kapat, onSuccess, onError }) {
+  const [tarih, setTarih] = useState("");
+  const [saat, setSaat] = useState("");
+  const [link, setLink] = useState("");
+  const [linkHata, setLinkHata] = useState("");
+  const [yukleniyor, setYukleniyor] = useState(false);
+
+  // Min selectable date = tomorrow (today excluded per requirement)
+  const minTarih = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  }, []);
+
+  // ESC closes modal (when not loading)
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape" && !yukleniyor) kapat(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [kapat, yukleniyor]);
+
+  // Soft URL validation (only if non-empty)
+  function validateLink(value) {
+    if (!value.trim()) return "";
+    try {
+      const u = new URL(value);
+      if (!/^https?:$/.test(u.protocol)) return "Bağlantı http:// veya https:// ile başlamalı.";
+      return "";
+    } catch (e) {
+      return "Geçerli bir bağlantı girin.";
+    }
+  }
+
+  function handleLinkChange(e) {
+    const v = e.target.value;
+    setLink(v);
+    setLinkHata(validateLink(v));
+  }
+
+  // Date sanity check on submit (defense-in-depth: HTML min is bypassable)
+  function tarihGecerliMi(dateStr) {
+    if (!dateStr) return false;
+    const sec = new Date(dateStr + "T00:00:00");
+    const yarin = new Date();
+    yarin.setHours(0, 0, 0, 0);
+    yarin.setDate(yarin.getDate() + 1);
+    return sec.getTime() >= yarin.getTime();
+  }
+
+  const formGecerli = !!tarih && !!saat && !linkHata && tarihGecerliMi(tarih);
+  const gonderilebilir = formGecerli && !yukleniyor;
+
+  async function handleGonder(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    if (!gonderilebilir) return;
+    setYukleniyor(true);
+
+    const payload = {
+      aday_ad: aday?.isim || "",
+      aday_mail: aday?.email || "",
+      ik_mail: ikMail || "",
+      sirket_adi: sirketAdi || "",
+      mulakat_tarihi: tarih,        // YYYY-MM-DD
+      mulakat_saati: saat,          // HH:MM
+      toplanti_linki: link.trim(),  // empty string if not provided
+    };
+
+    if (!payload.ik_mail) console.warn("[MulakatDaveti] ik_mail boş gönderiliyor");
+    if (!payload.sirket_adi) console.warn("[MulakatDaveti] sirket_adi boş gönderiliyor");
+    if (!payload.aday_mail) console.warn("[MulakatDaveti] aday_mail boş — webhook adayı belirleyemeyebilir");
+
+    try {
+      const res = await fetch(MULAKAT_WEBHOOK_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      onSuccess && onSuccess("Mülakat daveti başarıyla iletildi!");
+      kapat();
+    } catch (err) {
+      console.error("Mülakat daveti gönderilemedi:", err);
+      onError && onError("Mülakat daveti gönderilemedi. Lütfen tekrar deneyin.");
+    } finally {
+      setYukleniyor(false);
+    }
+  }
+
+  // Field label style
+  const labelStil = {
+    display: "flex", alignItems: "center", gap: 6,
+    fontFamily: F_MONO, fontSize: 10, fontWeight: 500,
+    color: T.muted, letterSpacing: "0.14em",
+    textTransform: "uppercase", marginBottom: 8,
+  };
+
+  // Field input style
+  const inputStil = {
+    width: "100%",
+    fontFamily: F_BODY, fontSize: 14,
+    background: T.surfaceRaised,
+    border: `1px solid ${T.border}`,
+    borderRadius: 10,
+    padding: "12px 14px",
+    color: T.text,
+    outline: "none",
+    transition: "border-color 0.2s ease, background-color 0.2s ease",
+  };
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="mulakat-modal-baslik"
+      onClick={() => { if (!yukleniyor) kapat(); }}
+      style={{
+        position: "fixed", inset: 0,
+        background: "var(--modal-backdrop)",
+        backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)",
+        zIndex: 10000, display: "flex", alignItems: "center", justifyContent: "center",
+        padding: 20, fontFamily: F_BODY,
+        animation: "fadeIn 0.25s ease",
+      }}
+    >
+      <form
+        onClick={(e) => e.stopPropagation()}
+        onSubmit={handleGonder}
+        style={{
+          background: T.surface,
+          border: `1px solid ${T.borderAccent}`,
+          borderRadius: 20,
+          maxWidth: 480, width: "100%",
+          maxHeight: "90vh", overflow: "auto",
+          boxShadow: "var(--modal-shadow)",
+          animation: "modalSlideUp 0.35s cubic-bezier(0.22, 1, 0.36, 1)",
+        }}
+      >
+        {/* Header */}
+        <div style={{
+          padding: "26px 28px 18px 28px",
+          borderBottom: `1px solid ${T.border}`,
+          display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16,
+        }}>
+          <div style={{ flex: 1 }}>
+            <SectionLabel>Mülakat Daveti</SectionLabel>
+            <h2
+              id="mulakat-modal-baslik"
+              style={{
+                margin: "10px 0 0 0",
+                fontFamily: F_DISPLAY, fontWeight: 500,
+                fontSize: 22,
+                letterSpacing: "-0.02em",
+                color: T.text,
+                fontVariationSettings: '"opsz" 48',
+              }}
+            >
+              {aday?.isim || "Aday"}<DotAccent />
+            </h2>
+            {aday?.pozisyon && (
+              <div style={{ marginTop: 6, fontSize: 12, color: T.muted, fontFamily: F_MONO, letterSpacing: "0.04em" }}>
+                {aday.pozisyon}
+              </div>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={kapat}
+            disabled={yukleniyor}
+            aria-label="Modal'ı kapat"
+            style={{
+              background: "transparent", border: `1px solid ${T.border}`,
+              color: T.muted, cursor: yukleniyor ? "not-allowed" : "pointer",
+              borderRadius: 999, width: 30, height: 30,
+              display: "inline-flex", alignItems: "center", justifyContent: "center",
+              flexShrink: 0,
+              opacity: yukleniyor ? 0.4 : 1,
+              transition: "color 0.2s ease, border-color 0.2s ease",
+            }}
+          >
+            <X size={14} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div style={{ padding: "22px 28px 4px 28px", display: "flex", flexDirection: "column", gap: 18 }}>
+          {/* Tarih */}
+          <div>
+            <label htmlFor="mulakat-tarih" style={labelStil}>
+              <Calendar size={11} /> Tarih
+            </label>
+            <input
+              id="mulakat-tarih"
+              type="date"
+              required
+              min={minTarih}
+              value={tarih}
+              onChange={(e) => setTarih(e.target.value)}
+              disabled={yukleniyor}
+              className="mulakat-field"
+              style={inputStil}
+            />
+            <div style={{ marginTop: 6, fontSize: 11, color: T.faint, fontFamily: F_MONO, letterSpacing: "0.02em" }}>
+              En erken {minTarih}
+            </div>
+          </div>
+
+          {/* Saat */}
+          <div>
+            <label htmlFor="mulakat-saat" style={labelStil}>
+              <Clock size={11} /> Saat
+            </label>
+            <input
+              id="mulakat-saat"
+              type="time"
+              required
+              value={saat}
+              onChange={(e) => setSaat(e.target.value)}
+              disabled={yukleniyor}
+              className="mulakat-field"
+              style={inputStil}
+            />
+          </div>
+
+          {/* Toplantı Linki — opsiyonel */}
+          <div>
+            <label htmlFor="mulakat-link" style={labelStil}>
+              <Link2 size={11} /> Toplantı Bağlantısı
+              <span style={{ marginLeft: 4, color: T.faint, textTransform: "none", letterSpacing: 0, fontWeight: 400 }}>(opsiyonel)</span>
+            </label>
+            <input
+              id="mulakat-link"
+              type="url"
+              placeholder="https://meet.google.com/..."
+              value={link}
+              onChange={handleLinkChange}
+              disabled={yukleniyor}
+              className="mulakat-field"
+              style={{
+                ...inputStil,
+                borderColor: linkHata ? T.weak : T.border,
+              }}
+            />
+            {linkHata && (
+              <div style={{ marginTop: 6, fontSize: 11, color: T.weak, fontFamily: F_BODY }}>
+                {linkHata}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Footer — actions */}
+        <div style={{
+          padding: "20px 28px 24px 28px",
+          marginTop: 8,
+          display: "flex", justifyContent: "flex-end", gap: 10,
+        }}>
+          <button
+            type="button"
+            onClick={kapat}
+            disabled={yukleniyor}
+            className="action-btn"
+            style={{
+              fontFamily: F_BODY, fontSize: 13, fontWeight: 500,
+              padding: "10px 20px",
+              background: "transparent",
+              border: `1px solid ${T.border}`,
+              color: T.muted,
+              cursor: yukleniyor ? "not-allowed" : "pointer",
+              borderRadius: 999,
+              opacity: yukleniyor ? 0.5 : 1,
+              transition: "all 0.2s ease",
+            }}
+          >
+            İptal
+          </button>
+          <button
+            type="submit"
+            disabled={!gonderilebilir}
+            style={{
+              fontFamily: F_BODY, fontSize: 13, fontWeight: 600,
+              padding: "10px 22px",
+              background: gonderilebilir ? T.accent : T.surfaceRaised,
+              border: `1px solid ${gonderilebilir ? T.accent : T.border}`,
+              color: gonderilebilir ? "#FFFFFF" : T.muted,
+              cursor: gonderilebilir ? "pointer" : "not-allowed",
+              borderRadius: 999,
+              display: "inline-flex", alignItems: "center", gap: 8,
+              boxShadow: gonderilebilir ? "0 4px 14px rgba(217,91,0,0.28)" : "none",
+              transition: "all 0.2s ease",
+              minWidth: 132,
+              justifyContent: "center",
+            }}
+          >
+            {yukleniyor ? (
+              <>
+                <Loader2 size={13} style={{ animation: "spin 0.9s linear infinite" }} />
+                Gönderiliyor…
+              </>
+            ) : (
+              <>
+                <Send size={13} />
+                Daveti Gönder
+              </>
+            )}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 // Circular progress — unchanged structure, website-token colors
 function CircularProgress({ puan, renk, isGold, size = 60 }) {
   const r = (size - 8) / 2;
@@ -452,7 +845,7 @@ function Karsilastir({ adaylar, kapat }) {
 // ═══════════════════════════════════════════════════════════
 //  CANDIDATE CARD — cursor spotlight + editorial typography
 // ═══════════════════════════════════════════════════════════
-function AdayKart({ aday, acik, toggle, karsilastirSecili, karsilastirToggle, isLast, animDelay = 0, tumAdaylar = [] }) {
+function AdayKart({ aday, acik, toggle, karsilastirSecili, karsilastirToggle, mulakatAc, isLast, animDelay = 0, tumAdaylar = [] }) {
   const renk = puanRengi(aday.puan, aday.durum);
   const secili = karsilastirSecili;
   const isGold = aday.durum === "yildiz";
@@ -703,6 +1096,41 @@ function AdayKart({ aday, acik, toggle, karsilastirSecili, karsilastirToggle, is
               >
                 <GitCompare size={12} /> {secili ? "Seçildi" : "Karşılaştır"}
               </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); mulakatAc && mulakatAc(aday); }}
+                disabled={aday.durum === "elendi"}
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: 6,
+                  fontFamily: F_BODY, fontSize: 12, fontWeight: 600,
+                  padding: "8px 18px",
+                  background: aday.durum === "elendi" ? "transparent" : T.accent,
+                  border: `1px solid ${aday.durum === "elendi" ? T.border : T.accent}`,
+                  color: aday.durum === "elendi" ? T.faint : "#FFFFFF",
+                  cursor: aday.durum === "elendi" ? "not-allowed" : "pointer",
+                  borderRadius: 999,
+                  boxShadow: aday.durum === "elendi" ? "none" : "0 4px 14px rgba(217,91,0,0.28)",
+                  transition: "all 0.2s ease",
+                  marginLeft: "auto",
+                }}
+                onMouseEnter={(e) => {
+                  if (aday.durum !== "elendi") {
+                    e.currentTarget.style.background = T.accentBright;
+                    e.currentTarget.style.borderColor = T.accentBright;
+                    e.currentTarget.style.transform = "translateY(-1px)";
+                    e.currentTarget.style.boxShadow = "0 6px 18px rgba(217,91,0,0.4)";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (aday.durum !== "elendi") {
+                    e.currentTarget.style.background = T.accent;
+                    e.currentTarget.style.borderColor = T.accent;
+                    e.currentTarget.style.transform = "translateY(0)";
+                    e.currentTarget.style.boxShadow = "0 4px 14px rgba(217,91,0,0.28)";
+                  }
+                }}
+              >
+                <Send size={12} /> Mülakata Çağır
+              </button>
             </div>
           </div>
         </div>
@@ -768,6 +1196,25 @@ export default function InteraktifRapor() {
   const [karsilastirAcik, setKarsilastirAcik] = useState(false);
   const [grafikAcik, setGrafikAcik] = useState(true);
   const [hoveredDept, setHoveredDept] = useState(null);
+
+  // ═══ MULAKAT DAVETI STATE ═══
+  const [mulakatModalAcik, setMulakatModalAcik] = useState(false);
+  const [mulakatAday, setMulakatAday] = useState(null);
+  const [toast, setToast] = useState(null);   // { tip: 'success'|'error', mesaj: string }
+  const [ikMail, setIkMail] = useState("");
+  const [sirketAdi, setSirketAdi] = useState("");
+
+  function mulakatAc(aday) {
+    setMulakatAday(aday);
+    setMulakatModalAcik(true);
+  }
+  function mulakatKapat() {
+    setMulakatModalAcik(false);
+    // do not clear aday immediately to avoid mid-animation flicker
+    window.setTimeout(() => setMulakatAday(null), 350);
+  }
+  function showToast(tip, mesaj) { setToast({ tip, mesaj }); }
+  function hideToast() { setToast(null); }
 
   // ═══ THEME STATE — localStorage + prefers-color-scheme ═══
   const THEME_KEY = "phantom-theme";
@@ -868,6 +1315,12 @@ export default function InteraktifRapor() {
       return; 
     }
 
+    // ik_mail + sirket: URL params take priority; fallback to row-level fields if present
+    const urlIkMail = urlParams.get("ik_mail") || "";
+    const urlSirket = urlParams.get("sirket") || "";
+    if (urlIkMail) setIkMail(urlIkMail);
+    if (urlSirket) setSirketAdi(urlSirket);
+
     // 🚀 SUPABASE VERİ ÇEKME MOTORU — şema: cvera_adaylar (sirket_id bazlı)
     const fetchAdaylar = async () => {
       try {
@@ -879,6 +1332,16 @@ export default function InteraktifRapor() {
         if (error) throw error;
 
         if (data && data.length > 0) {
+          // Row-level fallback for ik_mail + sirket_adi (only if URL didn't provide them).
+          // Schema may not have these columns yet — guarded reads.
+          const ilkRow = data[0] || {};
+          if (!urlIkMail && (ilkRow.ik_mail || ilkRow.ik_email)) {
+            setIkMail(ilkRow.ik_mail || ilkRow.ik_email);
+          }
+          if (!urlSirket && (ilkRow.sirket_adi || ilkRow.sirket_ismi)) {
+            setSirketAdi(ilkRow.sirket_adi || ilkRow.sirket_ismi);
+          }
+
           const formatli = data.map((row) => {
             // puan_detay JSONB — string ya da obje gelebilir
             let pd = {};
@@ -900,10 +1363,10 @@ export default function InteraktifRapor() {
               departman: row.departman || 'Belirtilmemiş',
               deneyim: row.toplam_deneyim || '',
               puanDetay: {
-                D: Number(pd.sektorel_deneyim || pd.D || 0),
-                Y: Number(pd.yetkinlik || pd.Y || 0),
-                K: Number(pd.kariyer_istikrari || pd.K || 0),
-                E: Number(pd.egitim_uyumu || pd.E || 0)
+                D: Number(pd.D || 0),
+                Y: Number(pd.Y || 0),
+                K: Number(pd.K || 0),
+                E: Number(pd.E || 0)
               },
               puan: Number(row.ai_puan || 0),
               durum: (row.on_eleme || row.cift_kontrol_durumu || '').toLowerCase().includes('elendi') ? 'elendi' : 'gecti',
@@ -1112,6 +1575,10 @@ export default function InteraktifRapor() {
     @keyframes spin { 100% { transform: rotate(360deg); } }
     @keyframes pulse { 0%, 100% { opacity: 0.85; } 50% { opacity: 1; } }
     @keyframes pulseDot { 0%, 100% { opacity: 0.7; transform: scale(1); } 50% { opacity: 1; transform: scale(1.2); } }
+    @keyframes toastSlideIn {
+      from { opacity: 0; transform: translateX(28px) translateY(-4px); }
+      to   { opacity: 1; transform: translateX(0) translateY(0); }
+    }
     /* Brand: slash breathes at 3.6s, subtle glow pulse */
     @keyframes slashBreath {
       0%, 100% { text-shadow: 0 0 8px ${T.accentGlowStrong}; opacity: 0.9; }
@@ -1122,6 +1589,29 @@ export default function InteraktifRapor() {
       0%, 100% { opacity: 0.85; }
       50%      { opacity: 1; transform: scale(1.15); }
     }
+    
+    /* Mülakat daveti modal field focus + native date/time picker theming */
+    .mulakat-field:focus {
+      border-color: ${T.accent} !important;
+      background: ${T.surface};
+      box-shadow: 0 0 0 3px ${T.accentGlow};
+    }
+    .mulakat-field:disabled { opacity: 0.5; cursor: not-allowed; }
+    /* Webkit calendar/clock icon — theme-aware tint */
+    :root[data-theme="dark"] .mulakat-field::-webkit-calendar-picker-indicator {
+      filter: invert(0.65) sepia(0) saturate(0) brightness(1.1);
+      cursor: pointer;
+      opacity: 0.7;
+      transition: opacity 0.2s ease;
+    }
+    :root[data-theme="dark"] .mulakat-field::-webkit-calendar-picker-indicator:hover { opacity: 1; }
+    :root[data-theme="light"] .mulakat-field::-webkit-calendar-picker-indicator {
+      filter: invert(0.35) sepia(0) saturate(0);
+      cursor: pointer;
+      opacity: 0.7;
+      transition: opacity 0.2s ease;
+    }
+    :root[data-theme="light"] .mulakat-field::-webkit-calendar-picker-indicator:hover { opacity: 1; }
     
     /* Magnetic hover — compact version */
     .action-btn:hover {
@@ -1603,6 +2093,7 @@ export default function InteraktifRapor() {
                         toggle={() => setAcikKartlar((p) => { const n = new Set(p); n.has(a.id) ? n.delete(a.id) : n.add(a.id); return n; })}
                         karsilastirSecili={!!karsilastirListesi.find((x) => x.id === a.id)}
                         karsilastirToggle={karsilastirToggle}
+                        mulakatAc={mulakatAc}
                         isLast={ai === g.adaylar.length - 1}
                         animDelay={idx * 50}
                         tumAdaylar={adaylarData}
@@ -1650,6 +2141,20 @@ export default function InteraktifRapor() {
       {karsilastirAcik && karsilastirListesi.length === 2 && (
         <Karsilastir adaylar={karsilastirListesi} kapat={() => setKarsilastirAcik(false)} />
       )}
+
+      {mulakatModalAcik && mulakatAday && (
+        <MulakatDavetiModal
+          aday={mulakatAday}
+          ikMail={ikMail}
+          sirketAdi={sirketAdi}
+          kapat={mulakatKapat}
+          onSuccess={(msg) => showToast("success", msg)}
+          onError={(msg) => showToast("error", msg)}
+        />
+      )}
+
+      <Toast toast={toast} kapat={hideToast} />
     </div>
   );
 }
+

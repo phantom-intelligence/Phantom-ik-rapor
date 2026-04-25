@@ -1362,7 +1362,7 @@ export default function InteraktifRapor() {
               pozisyon: row.hedef_pozisyon || '',
               departman: row.departman || 'Belirtilmemiş',
               deneyim: row.toplam_deneyim || '',
-              puanDetay: puanDetay: {
+              puanDetay: {
   D: Number(pd.sektorel_deneyim || pd.D || 0),
   Y: Number(pd.yetkinlik || pd.Y || 0),
   K: Number(pd.kariyer_istikrari || pd.K || 0),

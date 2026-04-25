@@ -1362,12 +1362,12 @@ export default function InteraktifRapor() {
               pozisyon: row.hedef_pozisyon || '',
               departman: row.departman || 'Belirtilmemiş',
               deneyim: row.toplam_deneyim || '',
-              puanDetay: {
-                D: Number(pd.D || 0),
-                Y: Number(pd.Y || 0),
-                K: Number(pd.K || 0),
-                E: Number(pd.E || 0)
-              },
+              puanDetay: puanDetay: {
+  D: Number(pd.sektorel_deneyim || pd.D || 0),
+  Y: Number(pd.yetkinlik || pd.Y || 0),
+  K: Number(pd.kariyer_istikrari || pd.K || 0),
+  E: Number(pd.egitim_uyumu || pd.E || 0)
+},
               puan: Number(row.ai_puan || 0),
               durum: (row.on_eleme || row.cift_kontrol_durumu || '').toLowerCase().includes('elendi') ? 'elendi' : 'gecti',
               ozet: row.yonetici_ozeti || '',

@@ -12,8 +12,8 @@ import {
 } from "recharts";
 
 // 🔌 SUPABASE MOTOR BAĞLANTISI (EKLENDİ)
-const supabaseUrl = 'https://qrwqjitxdzouyaluhabh.supabase.co'; 
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFyd3FqaXR4ZHpvdXlhbHVoYWJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxODk5MjIsImV4cCI6MjA5MTc2NTkyMn0.6U7X8o-0w8EdJTNYZTx-LejFVboYHZo6mHpBZjWu-p8'; 
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY; 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // n8n webhook — interview invite endpoint
